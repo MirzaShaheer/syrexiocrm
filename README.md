@@ -176,3 +176,20 @@ DATABASE_URL='postgresql://…' npm run db:seed     # first deploy only
 `npm warn allow-scripts` in a deploy log is noise, not a failure: npm now
 declines to run install scripts by default, and nothing in the build needs
 them. A clean `npm ci --ignore-scripts` builds fine.
+
+### Passwords
+
+The seed gives all six accounts the same password and that password is in this
+repository — fine for a local database of invented clients, not fine for a
+deployment anyone can reach. Set real ones before sharing the URL:
+
+```bash
+# everybody at once, printed once, never written to a file
+DATABASE_URL='postgresql://…' npm run set-password -- --all-random
+
+# or one person, typed in and hidden
+DATABASE_URL='postgresql://…' npm run set-password -- mir@agency.test
+```
+
+Changing a password signs that person out everywhere. There is no
+change-password screen in the app yet; this script is the only way in.
