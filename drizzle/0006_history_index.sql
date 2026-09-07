@@ -1,0 +1,1 @@
+CREATE INDEX "contracts_history_idx" ON "contracts" USING btree ("is_historical","won_month");

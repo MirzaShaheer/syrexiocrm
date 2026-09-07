@@ -20,6 +20,21 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
+  {
+    rules: {
+      // Server actions receive (prevState, formData) whether or not they use
+      // both. A leading underscore is the signal that the argument is there
+      // to satisfy the signature, not because we forgot it.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

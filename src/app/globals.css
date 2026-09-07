@@ -1,26 +1,362 @@
 @import "tailwindcss";
 
+/*
+  The whole palette, in both themes.
+
+  Greyscale carries the interface. Three semantic colours mean one thing each
+  and nothing else: red is late, gold is approaching, green is finished. Four
+  account hues identify the Upwork profiles and are used nowhere else.
+
+  Light mode sits on a soft blue-grey shade — never white — with cards in true
+  white so they lift off the page. Dark mode is a desaturated slate, not black,
+  so the account colours stay readable.
+*/
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --page: #e9edf4;
+  --raised: #ffffff;
+  --surface: #f1f4f9;
+  --surface-2: #e3e9f1;
+
+  --ink: #101923;
+  --ink-2: #3b4a5a;
+  --muted: #667889;
+
+  --line: #dfe5ee;
+  --line-strong: #c3cddb;
+
+  --late: #c0392b;
+  --soon: #8a5a11;
+  --done: #0f7a4d;
+
+  --brand: #2c5fd6;
+
+  /* Account identity. Four slots, assigned in lib/account-colors.ts. */
+  --acc-1-ink: #1d4ed8; /* blue */
+  --acc-1-tint: #e5ecfd;
+  --acc-2-ink: #0f766e; /* teal */
+  --acc-2-tint: #e0f2f0;
+  --acc-3-ink: #a21caf; /* magenta */
+  --acc-3-tint: #fbe8fc;
+  --acc-4-ink: #c2620e; /* orange */
+  --acc-4-tint: #fdeddf;
+
+  --shadow-sm: 0 1px 2px rgb(16 25 35 / 0.05), 0 1px 1px rgb(16 25 35 / 0.03);
+  --shadow-md: 0 1px 2px rgb(16 25 35 / 0.05), 0 6px 20px -6px rgb(16 25 35 / 0.12);
+  --shadow-lg: 0 2px 4px rgb(16 25 35 / 0.05), 0 18px 40px -12px rgb(16 25 35 / 0.18);
+
+  /*
+    The page backdrop. Two soft blooms and a hairline grid — enough that the
+    page reads as a surface, quiet enough that no row ever fights with it.
+  */
+  --bloom-1: rgb(44 95 214 / 0.09);
+  --bloom-2: rgb(15 118 110 / 0.07);
+  --grid-line: rgb(16 25 35 / 0.035);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #0d1217;
+  --raised: #151d24;
+  --surface: #1b242c;
+  --surface-2: #232e38;
+
+  --ink: #e8eef3;
+  --ink-2: #b4c2cd;
+  --muted: #8395a1;
+
+  --line: #253039;
+  --line-strong: #3a4854;
+
+  --late: #f08a7e;
+  --soon: #ddb264;
+  --done: #5cc493;
+
+  --brand: #86aaff;
+
+  --acc-1-ink: #86aaff;
+  --acc-1-tint: #172440;
+  --acc-2-ink: #4dc3b6;
+  --acc-2-tint: #0e2f2c;
+  --acc-3-ink: #e492ee;
+  --acc-3-tint: #331739;
+  --acc-4-ink: #f0a463;
+  --acc-4-tint: #382312;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px -6px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 18px 40px -12px rgb(0 0 0 / 0.6);
+
+  --bloom-1: rgb(70 120 255 / 0.1);
+  --bloom-2: rgb(20 160 150 / 0.07);
+  --grid-line: rgb(255 255 255 / 0.022);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-page: var(--page);
+  --color-raised: var(--raised);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-late: var(--late);
+  --color-soon: var(--soon);
+  --color-done: var(--done);
+  --color-brand: var(--brand);
+
+  /*
+    One radius scale for the whole product, deliberately larger than the
+    Tailwind defaults. Every `rounded-*` in the codebase picks these up, so
+    nothing anywhere has a hard ninety-degree corner.
+  */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-3xl: 28px;
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", Consolas,
+    monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--page);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /*
+    Deliberately transparent. `html` paints the page colour, which lets the
+    decorative layer below sit at z-index -1 — above the page colour, behind
+    every pixel of content. Give body its own background and it covers the
+    pattern completely.
+  */
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/*
+  The background design. A fixed layer behind everything: a fine grid that
+  fades out down the page, and two wide colour blooms anchored to the top
+  corners. Pointer-events off, so it can never intercept a click.
+*/
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(900px 520px at 8% -10%, var(--bloom-1), transparent 62%),
+    radial-gradient(780px 460px at 92% -6%, var(--bloom-2), transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    56px 56px,
+    56px 56px;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 55%,
+    transparent 100%
+  );
+}
+
+/*
+  Every number in the product: clocks, counts, small integers. Mono with
+  tabular figures, so a column of times lines up on the digit.
+*/
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/*
+  Money and any figure containing a separator. Mono gives "." and "," a full
+  character cell, which renders $12,450 as $12 , 450. Sans with tabular
+  figures aligns the columns without the gaps.
+*/
+.fig {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* A panel that should read as sitting on the page rather than in it. */
+.card {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+  The main container for a screen's content. Everything on a page lives inside
+  one of these, which is what gives the product its shape: soft white slabs
+  floating on the tinted page rather than rules drawn on a blank sheet.
+*/
+.panel {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+  padding: 18px 20px;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 14px;
+    border-radius: var(--radius-xl);
+  }
+}
+
+/*
+  A panel that reacts to the pointer — account tiles, count cards, any tile
+  that is also a link.
+*/
+.tile {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  background: var(--raised);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile {
+    transition:
+      box-shadow 160ms ease,
+      transform 160ms ease,
+      border-color 160ms ease;
+  }
+  .tile:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: var(--line-strong);
+  }
+}
+
+/*
+  List rows. The hover state is a rounded block rather than a full-bleed band,
+  which is why the row carries its own inline padding and the panel pulls it
+  back out again.
+*/
+.rowlink {
+  border-radius: var(--radius-md);
+  padding-inline: 8px;
+  margin-inline: -8px;
+}
+
+.rowlink:hover {
+  background: var(--surface);
+}
+
+/* Form controls, styled once here so no screen has to remember the recipe. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: var(--radius-sm);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--line-strong);
+}
+
+/* The one accent surface: primary buttons. */
+.btn-primary {
+  background: var(--ink);
+  color: var(--raised);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-md);
+}
+
+.btn {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--raised);
+  color: var(--ink-2);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Motion only when something actually changed after a user action. */
+@media (prefers-reduced-motion: no-preference) {
+  .pending {
+    opacity: 0.55;
+    transition: opacity 120ms linear;
+  }
+  .card,
+  .rowlink,
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease;
+  }
+}
+
+/* Keeps a long table or code block from pushing the page sideways. */
+.scroll-x {
+  overflow-x: auto;
+}
+
+/* Slim scrollbars, so a scrolling table does not grow a chunky grey band. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }

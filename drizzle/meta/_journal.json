@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788754274398,
+      "tag": "0000_bumpy_miek",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788758859395,
+      "tag": "0001_people_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788761838943,
+      "tag": "0002_notes_snooze_timezone",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788767309022,
+      "tag": "0003_telegram",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788769974326,
+      "tag": "0004_bid_weeks",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788775374612,
+      "tag": "0005_past_work",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788775403218,
+      "tag": "0006_history_index",
+      "breakpoints": true
+    }
+  ]
+}
