@@ -146,3 +146,33 @@ Time tracking, invoicing, proposal or bid management, a client-facing portal,
 file storage, chat replies from inside the app, revenue forecasting, and AI
 features. Upwork has no API for submitting proposals or spending Connects;
 bidding stays manual in the Upwork UI.
+
+## Deploying
+
+The build never needs a database. `src/db/index.ts` builds its pool on the
+first query rather than at import, so `next build` compiles with no
+`DATABASE_URL` at all — a pool created at module scope makes the build itself
+require a reachable database, which is exactly how the first Vercel deploy
+failed.
+
+What the running app needs:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | A **hosted** Postgres — Neon, Supabase, Railway, Vercel Postgres. The portable server in `scripts/pg.sh` listens on 127.0.0.1 and is not reachable from a deploy. On a serverless host use the provider's *pooled* connection string. |
+| `APP_URL` | for Telegram | The deployment's public URL. Deep links in notifications use it. |
+| `TELEGRAM_ENABLED` | no | Leave unset or `false` and messages go to the log instead of Telegram. |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` | only if enabled | Without all three the webhook is not registered and the app says so in the log. |
+| `CRON_SECRET` | for the alert cron | Bearer token `/api/cron/alerts` checks. |
+
+Migrations do not run on deploy. Point `DATABASE_URL` at the hosted database
+once and run them yourself:
+
+```bash
+DATABASE_URL='postgresql://…' npm run db:migrate
+DATABASE_URL='postgresql://…' npm run db:seed     # first deploy only
+```
+
+`npm warn allow-scripts` in a deploy log is noise, not a failure: npm now
+declines to run install scripts by default, and nothing in the build needs
+them. A clean `npm ci --ignore-scripts` builds fine.
