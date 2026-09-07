@@ -193,3 +193,27 @@ DATABASE_URL='postgresql://…' npm run set-password -- mir@agency.test
 
 Changing a password signs that person out everywhere. There is no
 change-password screen in the app yet; this script is the only way in.
+
+### Telegram: one bot, one webhook
+
+A Telegram bot can have exactly **one** webhook URL, so whichever server booted
+last owns it. Starting a local server with `TELEGRAM_ENABLED=true` silently
+repoints the bot away from production, and `/start <code>` then goes nowhere —
+the code looks unrecognised when in fact the reply had no route home.
+
+So `.env` keeps `TELEGRAM_ENABLED=false` locally: messages print to the console
+and the webhook is left alone. Flip it to `true` only while deliberately
+testing the bot against a tunnel, and redeploy production afterwards to take
+the webhook back.
+
+Check who owns it at any time:
+
+```bash
+curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
+```
+
+The deployment needs `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` and an `APP_URL` pointing at
+itself. Miss any one and Settings shows "Test mode" and no webhook is
+registered. Leave `TELEGRAM_FORCE_IPV6` unset on a host — it exists for
+networks that filter Telegram's IPv4 range.
