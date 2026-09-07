@@ -53,9 +53,7 @@ export async function postUpdate(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const __t=Date.now(); console.log("[pu] start");
   const actor = await requireUser();
-  console.log("[pu] auth", Date.now()-__t);
   const contractId = String(formData.get("contractId") ?? "");
   const body = String(formData.get("body") ?? "").trim();
 
@@ -81,9 +79,7 @@ export async function postUpdate(
     .set({ lastUpdateAt: at, updatedAt: at })
     .where(eq(contracts.id, contractId));
 
-  console.log("[pu] writes", Date.now()-__t);
   touch(contractId);
-  console.log("[pu] touch done", Date.now()-__t);
   return { ok: true, message: "Update posted." };
 }
 
