@@ -13,9 +13,19 @@ import { redact, type NotificationTransport } from "./transport";
  * hour to send, and records the outcome either way.
  */
 
+/**
+ * Default off, so nobody gets messaged by accident on a fresh checkout.
+ *
+ * Forgiving about how "on" is spelled. A strict `=== "true"` cost an afternoon
+ * of deployment debugging once: the variable was present and correct in the
+ * dashboard, and the app read it as off because of a stray space. A dashboard
+ * field is typed by a person, and `True`, `TRUE`, `1`, `yes` and `true ` all
+ * plainly mean the same thing. Anything genuinely unrecognised still reads as
+ * off — this loosens the spelling, not the default.
+ */
 export function telegramEnabled(): boolean {
-  // Default off. Nobody gets messaged by accident on a fresh checkout.
-  return process.env.TELEGRAM_ENABLED === "true";
+  const raw = process.env.TELEGRAM_ENABLED?.trim().toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes" || raw === "on";
 }
 
 /** Swap this one line to move the whole product onto WhatsApp later. */
