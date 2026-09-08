@@ -191,8 +191,13 @@ DATABASE_URL='postgresql://…' npm run set-password -- --all-random
 DATABASE_URL='postgresql://…' npm run set-password -- mir@agency.test
 ```
 
-Changing a password signs that person out everywhere. There is no
-change-password screen in the app yet; this script is the only way in.
+Changing a password signs that person out everywhere.
+
+Day to day nobody needs this: **Settings → Your password** lets each person
+change their own, which asks for the current one first — a session can be
+borrowed, and the one thing a borrowed session must not be able to do is lock
+the real owner out. The script is for the two cases a screen cannot cover:
+seeding a new deployment, and getting somebody back in who is locked out.
 
 ### Telegram: one bot, one webhook
 

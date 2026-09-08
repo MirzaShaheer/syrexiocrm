@@ -14,6 +14,7 @@ import { getLiveCode } from "@/lib/notifications/linking";
 import { telegramEnabled } from "@/lib/notifications";
 import { agoLabel, formatPktDateTime } from "@/lib/time";
 import { MyTelegramLink, UnlinkPerson } from "@/components/telegram-settings";
+import { ChangePassword } from "@/components/change-password";
 import { PageHead, Panel, PanelTitle } from "@/components/shell";
 
 export const metadata = { title: "Settings" };
@@ -81,6 +82,16 @@ export default async function SettingsPage() {
           </Link>
         }
       />
+
+      {/* -------------------------------------------------------- my password */}
+      <Panel className="mt-4">
+        <PanelTitle note="The only account setting you own">
+          Your password
+        </PanelTitle>
+        <div className="mt-3">
+          <ChangePassword />
+        </div>
+      </Panel>
 
       {/* ------------------------------------------------------- my linking */}
       <Panel className="mt-4">
