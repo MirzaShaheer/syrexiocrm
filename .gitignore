@@ -42,3 +42,10 @@ next-env.d.ts
 
 # keep the template committed
 !.env.example
+
+# One-off probe and debug scripts at the repo root. Several have been
+# committed by accident; the config files are the only .mjs that belong here.
+/*.mjs
+!/eslint.config.mjs
+!/postcss.config.mjs
+/*-ssr.html
