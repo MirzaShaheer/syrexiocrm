@@ -95,6 +95,26 @@ async function main() {
     console.log("  skip  no open notified alert to age");
   }
 
+  /* ------------------------------------------- silent baselines the nag clock */
+
+  console.log("\ngoing live silently");
+
+  // Recreate the going-live shape: alerts notified long ago, never nudged.
+  // Without the baseline in the silent run, every one of these is instantly
+  // overdue and the first ordinary run nudges the lot, to everybody.
+  await db.execute(sql`
+    update alerts
+    set notified_at = now() - interval '3 days', last_nudged_at = null
+    where resolved_at is null
+  `);
+
+  const silentRun = await run("?silent=true");
+  check("a silent run baselines the nag clock", Number(silentRun.baselined) > 0, true);
+  check("and messages nobody", silentRun.notified, 0);
+
+  const afterSilent = await run();
+  check("so the next ordinary run nudges nothing", afterSilent.nudged, 0);
+
   /* ------------------------------------------------------ the timed jobs */
 
   console.log("\nthe timed jobs");

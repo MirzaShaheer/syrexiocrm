@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef } from "react";
+import { useRefreshOnSuccess } from "@/components/use-refresh-on-success";
 import { assignOwner, type ActionResult } from "@/lib/actions/contracts";
 
 /**
@@ -19,6 +20,7 @@ export function AssignOwner({
     assignOwner,
     null,
   );
+  useRefreshOnSuccess(state);
   const formRef = useRef<HTMLFormElement>(null);
 
   return (

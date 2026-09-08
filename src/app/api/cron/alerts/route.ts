@@ -64,6 +64,25 @@ export async function POST(request: Request) {
   const started = Date.now();
   const engine = await runAlertEngine({ openSilently: silent });
 
+  /*
+   * A silent run means "adopt the state of the world without telling anyone",
+   * and that has to include the nag clock as well as the first notification.
+   *
+   * Eligibility for a nudge is measured from `coalesce(last_nudged_at,
+   * notified_at)`, so an alert notified days ago — before this feature existed,
+   * or before a silent re-baseline — is overdue the moment the code ships. The
+   * first ordinary run would then nudge every open alert at once, to everybody.
+   * Stamping them here starts the four hours from now instead.
+   */
+  let baselined = 0;
+  if (silent) {
+    const { rowCount } = await db.execute(sql`
+      update alerts set last_nudged_at = now()
+      where resolved_at is null and last_nudged_at is null
+    `);
+    baselined = rowCount ?? 0;
+  }
+
   /* ------------------------------------------------ notify newly opened */
   let notified = 0;
   let skipped = 0;
@@ -189,6 +208,7 @@ export async function POST(request: Request) {
     contractsEvaluated: engine.evaluated,
     alertsOpened: engine.opened.length,
     alertsResolved: engine.resolved,
+    baselined,
     notified,
     unowned,
     skipped,

@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contracts, events, users } from "@/db/schema";
@@ -81,9 +80,9 @@ export async function assignOwner(
     },
   });
 
-  revalidatePath("/");
-  revalidatePath("/today");
-  revalidatePath(`/contracts/${contractId}`);
+  // No revalidatePath: this action is dispatched from a form on Today, and a
+  // revalidating action leaves the client hanging on "Assigning…" for ever.
+  // The row refreshes from the client instead. See the README trap.
 
   return { ok: true, message: `Assigned to ${assignee.name}.` };
 }
