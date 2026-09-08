@@ -19,7 +19,33 @@ export async function register() {
     console.log("[telegram] preferring IPv6 for outbound requests");
   }
 
-  const enabled = process.env.TELEGRAM_ENABLED === "true";
+  /*
+   * Spelled the same way `telegramEnabled()` in lib/notifications reads it.
+   * A strict `=== "true"` here was a trap: with TELEGRAM_ENABLED=1 the app
+   * would happily send messages while this function quietly declined to
+   * register the webhook, so alerts went out and nothing anybody sent back
+   * ever arrived. Parsed inline rather than imported, because that module
+   * pulls in the database and this runs at boot.
+   */
+  const raw = process.env.TELEGRAM_ENABLED?.trim().toLowerCase();
+  const enabled = raw === "true" || raw === "1" || raw === "yes" || raw === "on";
+
+  /*
+   * A bot has exactly one webhook, and whoever called setWebhook last owns it.
+   *
+   * On Vercel every preview deployment runs this same code at cold start with
+   * the same environment variables, unless they have been scoped to Production
+   * by hand. One request to a preview URL would then repoint the live bot at
+   * that preview, and production would go quiet — no error, nothing in the log,
+   * just a bot that has stopped answering. Scoping the variables is the real
+   * fix; this makes forgetting to survivable.
+   */
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
+    console.log(
+      `[telegram] VERCEL_ENV is ${process.env.VERCEL_ENV} — not touching the webhook, which belongs to production.`,
+    );
+    return;
+  }
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const url = process.env.APP_URL;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useRefreshOnSuccess } from "@/components/use-refresh-on-success";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ActionResult } from "@/lib/actions/contracts";
 import { bulkAssign, markReplied } from "@/lib/actions/create";
@@ -15,6 +16,7 @@ export function RepliedButton({ contractId }: { contractId: string }) {
     markReplied,
     null,
   );
+  useRefreshOnSuccess(state);
 
   if (state?.ok) {
     return <span className="text-[11.5px] text-done">Logged</span>;
@@ -50,6 +52,7 @@ export function BulkAssign({
     bulkAssign,
     null,
   );
+  useRefreshOnSuccess(state);
   const [selected, setSelected] = useState<string[]>([]);
 
   const allSelected = selected.length === contracts.length && contracts.length > 0;

@@ -12,6 +12,14 @@ const previewOrigins = process.env.PREVIEW_TUNNEL
   : [];
 
 const nextConfig: NextConfig = {
+  /**
+   * A dev server and a production build share `.next` by default, and a build
+   * run while `next dev` is watching fails part way through with a
+   * PageNotFoundError naming a different page each time — the two are
+   * overwriting each other's manifests. Set NEXT_DIST_DIR to build into its
+   * own directory instead of stopping the dev server first.
+   */
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   experimental: {
     serverActions: {
       allowedOrigins: previewOrigins,

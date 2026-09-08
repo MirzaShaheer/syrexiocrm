@@ -13,7 +13,12 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts",
-    "set-password": "tsx scripts/set-password.ts"
+    "set-password": "tsx scripts/set-password.ts",
+    "check": "npm run check:shift && npm run check:bot && npm run check:cron",
+    "check:shift": "tsx scripts/check-shift-hours.ts",
+    "check:bot": "tsx --conditions=react-server scripts/check-bot.ts",
+    "check:cron": "tsx --conditions=react-server scripts/check-cron.ts",
+    "db:check": "tsx scripts/check-db.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

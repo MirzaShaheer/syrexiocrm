@@ -1,100 +1,112 @@
 @import "tailwindcss";
 
 /*
-  The whole palette, in both themes.
+  The whole palette, in both themes. Dark is the default.
 
-  Greyscale carries the interface. Three semantic colours mean one thing each
-  and nothing else: red is late, gold is approaching, green is finished. Four
-  account hues identify the Upwork profiles and are used nowhere else.
+  The depth in this interface comes from light, not from pattern: a deep
+  ground, panels that sit clearly above it, and a one-pixel highlight along
+  each panel's top edge so it reads as a physical slab lit from above. There
+  is deliberately no background texture — a grid or a gradient bloom behind
+  the content adds noise to a screen whose whole job is to make one late
+  number obvious.
 
-  Light mode sits on a soft blue-grey shade — never white — with cards in true
-  white so they lift off the page. Dark mode is a desaturated slate, not black,
-  so the account colours stay readable.
+  Colour means exactly three things and nothing else: red is late, amber is
+  approaching, green is finished. Four account hues identify the Upwork
+  profiles and are used nowhere else.
 */
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-:root {
+/* ------------------------------------------------------------------ dark */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Ground, then two levels above it. Each step is clearly lighter. */
+  --page: #070a0e;
+  --raised: #1a222d;
+  --surface: #232c39;
+  --surface-2: #2e3846;
+
+  --ink: #eef2f7;
+  --ink-2: #aab7c5;
+  --muted: #72808f;
+
+  --line: #2a3542;
+  --line-strong: #3d4a5a;
+
+  --late: #ff6b5e;
+    --soon: #f0b64d;
+  --done: #3ecf8e;
+
+  --brand: #6ea8fe;
+
+  /* Account identity. Four slots, assigned in lib/account-colors.ts. */
+  --acc-1-ink: #7aa7ff; /* blue */
+  --acc-1-tint: #16233d;
+  --acc-2-ink: #3fc9b9; /* teal */
+  --acc-2-tint: #0d2f2c;
+  --acc-3-ink: #e58cf0; /* magenta */
+  --acc-3-tint: #321840;
+  --acc-4-ink: #f5a25c; /* orange */
+  --acc-4-tint: #3a2413;
+
+  /*
+    The top-edge highlight. One pixel of light along the upper border of every
+    raised surface — the single detail that separates a dark interface that
+    looks designed from one that looks unpainted.
+  */
+  --edge: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --edge-strong: inset 0 1px 0 rgb(255 255 255 / 0.1);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.4), 0 24px 48px -16px rgb(0 0 0 / 0.7);
+
+  --ring: rgb(110 168 254 / 0.5);
+}
+
+/* ----------------------------------------------------------------- light */
+
+[data-theme="light"] {
   color-scheme: light;
 
-  --page: #e9edf4;
+  --page: #eef1f5;
   --raised: #ffffff;
-  --surface: #f1f4f9;
-  --surface-2: #e3e9f1;
+  --surface: #f4f6f9;
+  --surface-2: #e8ecf2;
 
-  --ink: #101923;
-  --ink-2: #3b4a5a;
-  --muted: #667889;
+  --ink: #0f1620;
+  --ink-2: #3d4a59;
+  --muted: #66748a;
 
-  --line: #dfe5ee;
-  --line-strong: #c3cddb;
+  --line: #e2e7ee;
+  --line-strong: #c5cede;
 
-  --late: #c0392b;
+  --late: #c8372a;
   --soon: #8a5a11;
   --done: #0f7a4d;
 
   --brand: #2c5fd6;
 
-  /* Account identity. Four slots, assigned in lib/account-colors.ts. */
-  --acc-1-ink: #1d4ed8; /* blue */
-  --acc-1-tint: #e5ecfd;
-  --acc-2-ink: #0f766e; /* teal */
+  --acc-1-ink: #1d4ed8;
+  --acc-1-tint: #e6ecfd;
+  --acc-2-ink: #0f766e;
   --acc-2-tint: #e0f2f0;
-  --acc-3-ink: #a21caf; /* magenta */
+  --acc-3-ink: #a21caf;
   --acc-3-tint: #fbe8fc;
-  --acc-4-ink: #c2620e; /* orange */
+  --acc-4-ink: #c2620e;
   --acc-4-tint: #fdeddf;
 
-  --shadow-sm: 0 1px 2px rgb(16 25 35 / 0.05), 0 1px 1px rgb(16 25 35 / 0.03);
-  --shadow-md: 0 1px 2px rgb(16 25 35 / 0.05), 0 6px 20px -6px rgb(16 25 35 / 0.12);
-  --shadow-lg: 0 2px 4px rgb(16 25 35 / 0.05), 0 18px 40px -12px rgb(16 25 35 / 0.18);
+  --edge: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  --edge-strong: inset 0 1px 0 rgb(255 255 255 / 1);
 
-  /*
-    The page backdrop. Two soft blooms and a hairline grid — enough that the
-    page reads as a surface, quiet enough that no row ever fights with it.
-  */
-  --bloom-1: rgb(44 95 214 / 0.09);
-  --bloom-2: rgb(15 118 110 / 0.07);
-  --grid-line: rgb(16 25 35 / 0.035);
-}
+  --shadow-sm: 0 1px 2px rgb(15 22 32 / 0.06);
+  --shadow-md: 0 1px 2px rgb(15 22 32 / 0.05), 0 8px 24px -8px rgb(15 22 32 / 0.14);
+  --shadow-lg: 0 2px 4px rgb(15 22 32 / 0.05), 0 24px 48px -16px rgb(15 22 32 / 0.2);
 
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  --page: #0d1217;
-  --raised: #151d24;
-  --surface: #1b242c;
-  --surface-2: #232e38;
-
-  --ink: #e8eef3;
-  --ink-2: #b4c2cd;
-  --muted: #8395a1;
-
-  --line: #253039;
-  --line-strong: #3a4854;
-
-  --late: #f08a7e;
-  --soon: #ddb264;
-  --done: #5cc493;
-
-  --brand: #86aaff;
-
-  --acc-1-ink: #86aaff;
-  --acc-1-tint: #172440;
-  --acc-2-ink: #4dc3b6;
-  --acc-2-tint: #0e2f2c;
-  --acc-3-ink: #e492ee;
-  --acc-3-tint: #331739;
-  --acc-4-ink: #f0a463;
-  --acc-4-tint: #382312;
-
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px -6px rgb(0 0 0 / 0.5);
-  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 18px 40px -12px rgb(0 0 0 / 0.6);
-
-  --bloom-1: rgb(70 120 255 / 0.1);
-  --bloom-2: rgb(20 160 150 / 0.07);
-  --grid-line: rgb(255 255 255 / 0.022);
+  --ring: rgb(44 95 214 / 0.4);
 }
 
 @theme inline {
@@ -115,18 +127,14 @@
   --color-done: var(--done);
   --color-brand: var(--brand);
 
-  /*
-    One radius scale for the whole product, deliberately larger than the
-    Tailwind defaults. Every `rounded-*` in the codebase picks these up, so
-    nothing anywhere has a hard ninety-degree corner.
-  */
+  /* One radius scale for the whole product. */
   --radius-xs: 6px;
-  --radius-sm: 10px;
+  --radius-sm: 9px;
   --radius-md: 12px;
   --radius-lg: 14px;
   --radius-xl: 18px;
-  --radius-2xl: 22px;
-  --radius-3xl: 28px;
+  --radius-2xl: 20px;
+  --radius-3xl: 26px;
 
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
@@ -140,13 +148,7 @@ html {
 }
 
 body {
-  /*
-    Deliberately transparent. `html` paints the page colour, which lets the
-    decorative layer below sit at z-index -1 — above the page colour, behind
-    every pixel of content. Give body its own background and it covers the
-    pattern completely.
-  */
-  background: transparent;
+  background: var(--page);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -155,44 +157,17 @@ body {
   min-height: 100dvh;
 }
 
-/*
-  The background design. A fixed layer behind everything: a fine grid that
-  fades out down the page, and two wide colour blooms anchored to the top
-  corners. Pointer-events off, so it can never intercept a click.
-*/
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    radial-gradient(900px 520px at 8% -10%, var(--bloom-1), transparent 62%),
-    radial-gradient(780px 460px at 92% -6%, var(--bloom-2), transparent 60%),
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size:
-    100% 100%,
-    100% 100%,
-    56px 56px,
-    56px 56px;
-  mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 55%,
-    transparent 100%
-  );
-}
+/* --------------------------------------------------------------- numbers */
 
 /*
-  Every number in the product: clocks, counts, small integers. Mono with
-  tabular figures, so a column of times lines up on the digit.
+  Clocks, counts, small integers. Mono with tabular figures, so a column of
+  times lines up on the digit rather than drifting.
 */
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -203,27 +178,28 @@ body::before {
 .fig {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
 }
 
-/* A panel that should read as sitting on the page rather than in it. */
-.card {
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
+/* -------------------------------------------------------------- surfaces */
 
 /*
   The main container for a screen's content. Everything on a page lives inside
-  one of these, which is what gives the product its shape: soft white slabs
-  floating on the tinted page rather than rules drawn on a blank sheet.
+  one of these: slabs floating above the ground, each with a lit top edge.
 */
 .panel {
   background: var(--raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--edge), var(--shadow-md);
   padding: 18px 20px;
+}
+
+.card {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--edge), var(--shadow-sm);
 }
 
 @media (max-width: 640px) {
@@ -234,85 +210,118 @@ body::before {
 }
 
 /*
-  A panel that reacts to the pointer — account tiles, count cards, any tile
-  that is also a link.
+  A surface that reacts to the pointer — account tiles, count cards, anything
+  that is also a link. The hover lifts it and warms the border, which is the
+  whole highlight vocabulary: nothing moves that was not clicked.
 */
 .tile {
+  position: relative;
   border-radius: var(--radius-xl);
   border: 1px solid var(--line);
   background: var(--raised);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--edge), var(--shadow-sm);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .tile {
     transition:
-      box-shadow 160ms ease,
-      transform 160ms ease,
-      border-color 160ms ease;
-  }
-  .tile:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-    border-color: var(--line-strong);
+      box-shadow 180ms ease,
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease;
   }
 }
 
+.tile:hover {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  box-shadow: var(--edge-strong), var(--shadow-md);
+  transform: translateY(-2px);
+}
+
 /*
-  List rows. The hover state is a rounded block rather than a full-bleed band,
-  which is why the row carries its own inline padding and the panel pulls it
-  back out again.
+  List rows. The hover is a rounded block inset from the panel edge, so a long
+  list reads as a stack of separate things rather than a striped table.
 */
 .rowlink {
   border-radius: var(--radius-md);
-  padding-inline: 8px;
-  margin-inline: -8px;
+  padding-inline: 10px;
+  margin-inline: -10px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rowlink {
+    transition: background-color 140ms ease;
+  }
 }
 
 .rowlink:hover {
   background: var(--surface);
 }
 
-/* Form controls, styled once here so no screen has to remember the recipe. */
+/* ---------------------------------------------------------------- controls */
+
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   border-radius: var(--radius-sm);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
 }
 
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
-  border-color: var(--line-strong);
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
-/* The one accent surface: primary buttons. */
+/* The one filled surface: primary buttons. */
 .btn-primary {
   background: var(--ink);
-  color: var(--raised);
+  color: var(--page);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover:not(:disabled) {
   box-shadow: var(--shadow-md);
+  opacity: 0.92;
 }
 
 .btn {
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong);
-  background: var(--raised);
-  color: var(--ink-2);
+  background: var(--surface);
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--surface);
+  background: var(--surface-2);
+  border-color: var(--line-strong);
 }
+
+/* ------------------------------------------------------------------ focus */
 
 :focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
+}
+
+/* Keeps a long table or code block from pushing the page sideways. */
+.scroll-x {
+  overflow-x: auto;
 }
 
 /* Motion only when something actually changed after a user action. */
@@ -321,42 +330,22 @@ textarea:focus {
     opacity: 0.55;
     transition: opacity 120ms linear;
   }
-  .card,
-  .rowlink,
-  a,
-  button,
-  input,
-  select,
-  textarea {
-    transition:
-      background-color 140ms ease,
-      border-color 140ms ease,
-      box-shadow 140ms ease,
-      color 140ms ease;
+}
+
+/*
+  The count editor's field pane. Picking a different account on the rail
+  replaces the whole pane, so it slides out from the rail rather than
+  snapping — the one cue that these boxes now belong to somebody else.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  .swipe-in {
+    animation: swipe-in 200ms cubic-bezier(0.22, 0.8, 0.3, 1);
   }
 }
 
-/* Keeps a long table or code block from pushing the page sideways. */
-.scroll-x {
-  overflow-x: auto;
-}
-
-/* Slim scrollbars, so a scrolling table does not grow a chunky grey band. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-
-*::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border-radius: 999px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes swipe-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
 }

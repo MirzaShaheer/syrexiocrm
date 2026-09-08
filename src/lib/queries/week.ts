@@ -1,6 +1,13 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { listWeekCountsTrash } from "@/lib/trash";
+import type { TrashEntry } from "@/lib/week-counts";
+
+/** Numeric columns come back as strings; null has to survive the trip. */
+function num(v: string | null): number | null {
+  return v === null ? null : Number(v);
+}
 
 function asDate(v: string | Date | null): Date | null {
   if (v === null) return null;
@@ -23,12 +30,19 @@ export function weekStartPkt(d = new Date()): Date {
 export type AccountFunnel = {
   accountId: string;
   label: string;
-  /** Typed in each Monday. Null means nobody entered it. */
+  /*
+   * The five typed counts. Null on each means nobody entered it, which is a
+   * different thing from a genuine zero and is shown differently.
+   */
   bids: number | null;
-  /** Contracts whose first client message landed this week. */
-  chatsOpened: number;
-  /** Contracts that started this week — the ones that were won. */
-  won: number;
+  chatsOpened: number | null;
+  contracted: number | null;
+  closed: number | null;
+  withdrawn: number | null;
+  /** Contracts whose last client message landed this week. */
+  chatsFromCrm: number;
+  /** Contracts that started this week, per the CRM itself. */
+  contractsStarted: number;
   /** Approved milestone value this week. */
   earned: number;
 };
@@ -45,11 +59,16 @@ export type WeekSummary = {
   perPerson: {
     id: string;
     name: string;
+    /** Every update this person has ever posted. */
     updates: number;
+    /** How many of those landed inside this week. */
+    updatesThisWeek: number;
     contractsOwned: number;
     alertsOpened: number;
   }[];
   funnel: AccountFunnel[];
+  /** Deleted count rows still inside their thirty days, newest first. */
+  trash: TrashEntry[];
 };
 
 /**
@@ -87,12 +106,15 @@ export async function getWeek(reference = new Date()): Promise<WeekSummary> {
     id: string;
     name: string;
     updates: string;
+    updates_this_week: string;
     contracts_owned: string;
     alerts_opened: string;
   }>(sql`
     select u.id, u.name,
       (select count(*) from updates up
-        where up.author_user_id = u.id and up.created_at >= ${from} and up.created_at < ${to}) as updates,
+        where up.author_user_id = u.id) as updates,
+      (select count(*) from updates up
+        where up.author_user_id = u.id and up.created_at >= ${from} and up.created_at < ${to}) as updates_this_week,
       (select count(*) from contracts c
         where c.owner_user_id = u.id and c.status = 'active' and c.archived = false) as contracts_owned,
       (select count(*) from alerts a
@@ -106,28 +128,34 @@ export async function getWeek(reference = new Date()): Promise<WeekSummary> {
     account_id: string;
     label: string;
     bids: string | null;
-    chats_opened: string;
-    won: string;
+    chats_opened: string | null;
+    contracted: string | null;
+    closed: string | null;
+    withdrawn: string | null;
+    chats_from_crm: string;
+    contracts_started: string;
     earned: string;
   }>(sql`
     select
       a.id as account_id, a.label,
-      (select b.bids from bid_weeks b
-        where b.account_id = a.id and b.week_start = ${from}) as bids,
+      b.bids, b.chats_opened, b.contracted, b.closed, b.withdrawn,
       (select count(*) from contracts c
         where c.account_id = a.id
-          and c.last_client_message_at >= ${from} and c.last_client_message_at < ${to}) as chats_opened,
+          and c.last_client_message_at >= ${from} and c.last_client_message_at < ${to}) as chats_from_crm,
       (select count(*) from contracts c
         where c.account_id = a.id
-          and c.started_at >= ${from} and c.started_at < ${to}) as won,
+          and c.started_at >= ${from} and c.started_at < ${to}) as contracts_started,
       (select coalesce(sum(m.amount), 0) from milestones m
         join contracts c on c.id = m.contract_id
         where c.account_id = a.id and m.status = 'approved'
           and m.approved_at >= ${from} and m.approved_at < ${to}) as earned
     from accounts a
+    left join bid_weeks b on b.account_id = a.id and b.week_start = ${from}
     where a.active = true
     order by a.label
   `);
+
+  const trash = await listWeekCountsTrash(reference);
 
   const t = totals[0];
   return {
@@ -143,17 +171,23 @@ export async function getWeek(reference = new Date()): Promise<WeekSummary> {
       id: p.id,
       name: p.name,
       updates: Number(p.updates),
+      updatesThisWeek: Number(p.updates_this_week),
       contractsOwned: Number(p.contracts_owned),
       alertsOpened: Number(p.alerts_opened),
     })),
     funnel: funnel.map((f) => ({
       accountId: f.account_id,
       label: f.label,
-      bids: f.bids === null ? null : Number(f.bids),
-      chatsOpened: Number(f.chats_opened),
-      won: Number(f.won),
+      bids: num(f.bids),
+      chatsOpened: num(f.chats_opened),
+      contracted: num(f.contracted),
+      closed: num(f.closed),
+      withdrawn: num(f.withdrawn),
+      chatsFromCrm: Number(f.chats_from_crm),
+      contractsStarted: Number(f.contracts_started),
       earned: Number(f.earned),
     })),
+    trash,
   };
 }
 

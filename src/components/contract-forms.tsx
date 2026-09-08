@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useRef, useState } from "react";
+import { useRefreshOnSuccess } from "@/components/use-refresh-on-success";
 import type { ActionResult } from "@/lib/actions/contracts";
 import {
   addNote,
@@ -14,23 +14,6 @@ import {
 } from "@/lib/actions/contract-detail";
 import { SNOOZE_DURATIONS } from "@/lib/alert-rules";
 import type { Stage } from "@/lib/pipelines";
-
-/*
- * The contract actions no longer revalidate the contract route from the server
- * — revalidating the route a form is rendered on leaves the action response
- * hanging. Every form refreshes here instead, once its result has landed.
- */
-function useRefreshOnSuccess(
-  state: ActionResult | null,
-  formRef?: React.RefObject<HTMLFormElement | null>,
-) {
-  const router = useRouter();
-  useEffect(() => {
-    if (!state?.ok) return;
-    formRef?.current?.reset();
-    router.refresh();
-  }, [state, router, formRef]);
-}
 
 /** Shared result line. Success is quiet; a refusal says what to do next. */
 function Result({ state }: { state: ActionResult | null }) {

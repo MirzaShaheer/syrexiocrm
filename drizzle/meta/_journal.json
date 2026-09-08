@@ -50,6 +50,27 @@
       "when": 1788775403218,
       "tag": "0006_history_index",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788849981138,
+      "tag": "0007_funnel_counts",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788851627541,
+      "tag": "0008_bot_two_way",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788852202791,
+      "tag": "0009_bid_week_trash",
+      "breakpoints": true
     }
   ]
 }

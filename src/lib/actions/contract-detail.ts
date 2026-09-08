@@ -1,14 +1,18 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { alerts, contracts, events, notes, updates, users } from "@/db/schema";
+import { alerts, contracts, events } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { canEditContract, canAssignOwner } from "@/lib/permissions";
-import { RULES, SNOOZE_DURATIONS, type RuleKey } from "@/lib/alert-rules";
+import {
+  addNoteFor,
+  handOverFor,
+  postUpdateFor,
+  setNextActionFor,
+  snoozeAlertFor,
+} from "@/lib/ops";
+import { canEditContract } from "@/lib/permissions";
 import { isValidStage, stageLabel, type Niche } from "@/lib/pipelines";
-import { formatPktDateTime } from "@/lib/time";
 import type { ActionResult } from "@/lib/actions/contracts";
 
 /** Loads the contract and checks the actor may change fields on it. */
@@ -32,15 +36,22 @@ const DENIED =
   "This record was created by someone else. Ask them to make the change, or ask Mir for temporary edit access.";
 
 /*
- * Revalidates the screens a change affects, but never the contract page
- * itself: revalidating the route a form is rendered on leaves the action
- * response hanging, so the button sits on "Saving…" forever. The contract
- * page refreshes from the client once the result arrives.
+ * Deliberately empty, and it has to stay that way.
+ *
+ * A server action dispatched from a form on this screen must not call
+ * revalidatePath at all — not even for a different route. Measured on a clean
+ * production build: with either revalidatePath("/today") or revalidatePath("/")
+ * the action hung 10 times out of 10; with neither, 0 out of 10. The server
+ * finishes its work and answers 200 with a complete payload in ~110ms, but the
+ * client never applies it, so useActionState never settles and the button sits
+ * on "Saving…" forever. The earlier version of this function excluded only the
+ * contract's own path, which was not enough.
+ *
+ * Freshness is handled on the client instead: every form here calls
+ * router.refresh() once its result lands (useRefreshOnSuccess), and the other
+ * screens are dynamic, so navigating to them refetches anyway.
  */
-function touch(_contractId: string) {
-  revalidatePath("/today");
-  revalidatePath("/");
-}
+function touch(_contractId: string) {}
 
 /* ---------------------------------------------------------------- updates */
 
@@ -55,32 +66,13 @@ export async function postUpdate(
 ): Promise<ActionResult> {
   const actor = await requireUser();
   const contractId = String(formData.get("contractId") ?? "");
-  const body = String(formData.get("body") ?? "").trim();
-
-  if (!body) return { ok: false, message: "Write a line before posting." };
-  if (body.length > 2000) {
-    return { ok: false, message: "That is too long for an update. Keep it to a line or two." };
-  }
-
-  const contract = await loadContract(contractId);
-  if (!contract) return { ok: false, message: "That contract no longer exists." };
-
-  const at = new Date();
-  await db.insert(updates).values({ contractId, authorUserId: actor.id, body, createdAt: at });
-  await db.insert(events).values({
+  const result = await postUpdateFor(
+    actor,
     contractId,
-    type: "update_posted",
-    actor: actor.id,
-    payload: { excerpt: body.slice(0, 120) },
-    occurredAt: at,
-  });
-  await db
-    .update(contracts)
-    .set({ lastUpdateAt: at, updatedAt: at })
-    .where(eq(contracts.id, contractId));
-
-  touch(contractId);
-  return { ok: true, message: "Update posted." };
+    String(formData.get("body") ?? ""),
+  );
+  if (result.ok) touch(contractId);
+  return result;
 }
 
 /* ------------------------------------------------------------------ notes */
@@ -92,23 +84,13 @@ export async function addNote(
 ): Promise<ActionResult> {
   const actor = await requireUser();
   const contractId = String(formData.get("contractId") ?? "");
-  const body = String(formData.get("body") ?? "").trim();
-
-  if (!body) return { ok: false, message: "Write the note before saving." };
-
-  const contract = await loadContract(contractId);
-  if (!contract) return { ok: false, message: "That contract no longer exists." };
-
-  await db.insert(notes).values({ contractId, authorUserId: actor.id, body });
-  await db.insert(events).values({
+  const result = await addNoteFor(
+    actor,
     contractId,
-    type: "note_added",
-    actor: actor.id,
-    payload: { excerpt: body.slice(0, 120) },
-  });
-
-  touch(contractId);
-  return { ok: true, message: "Note saved." };
+    String(formData.get("body") ?? ""),
+  );
+  if (result.ok) touch(contractId);
+  return result;
 }
 
 /* ------------------------------------------------------------ next action */
@@ -119,43 +101,16 @@ export async function setNextAction(
 ): Promise<ActionResult> {
   const actor = await requireUser();
   const contractId = String(formData.get("contractId") ?? "");
-  const text = String(formData.get("text") ?? "").trim();
   const due = String(formData.get("dueAt") ?? "").trim();
-
-  const contract = await loadContract(contractId);
-  if (!contract) return { ok: false, message: "That contract no longer exists." };
-  if (!canEditContract(actor, contract)) return { ok: false, message: DENIED };
-
-  if (text && !due) {
-    return {
-      ok: false,
-      message: "A next action needs a due date, otherwise nothing ever chases it.",
-    };
-  }
-
   // datetime-local arrives as the user's wall clock; the team works in PKT.
-  const dueAt = due ? new Date(`${due}:00+05:00`) : null;
-  if (due && Number.isNaN(dueAt!.getTime())) {
-    return { ok: false, message: "That date could not be read. Pick it again." };
-  }
-
-  await db
-    .update(contracts)
-    .set({ nextActionText: text || null, nextActionDueAt: dueAt, updatedAt: new Date() })
-    .where(eq(contracts.id, contractId));
-
-  await db.insert(events).values({
+  const result = await setNextActionFor(
+    actor,
     contractId,
-    type: "next_action_changed",
-    actor: actor.id,
-    payload: {
-      text: text || null,
-      dueAt: dueAt ? dueAt.toISOString() : null,
-    },
-  });
-
-  touch(contractId);
-  return { ok: true, message: text ? "Next action set." : "Next action cleared." };
+    String(formData.get("text") ?? ""),
+    due ? new Date(`${due}:00+05:00`) : null,
+  );
+  if (result.ok) touch(contractId);
+  return result;
 }
 
 /* ------------------------------------------------------------------ stage */
@@ -205,63 +160,14 @@ export async function handOver(
 ): Promise<ActionResult> {
   const actor = await requireUser();
   const contractId = String(formData.get("contractId") ?? "");
-  const toUserId = String(formData.get("toUserId") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-
-  if (!toUserId) return { ok: false, message: "Choose who is taking this on." };
-
-  const contract = await loadContract(contractId);
-  if (!contract) return { ok: false, message: "That contract no longer exists." };
-  if (!canAssignOwner(actor, contract)) {
-    return {
-      ok: false,
-      message:
-        "Somebody else owns this one. Ask them to hand it over, or ask Mir for temporary edit access.",
-    };
-  }
-  if (contract.ownerUserId && !reason) {
-    return {
-      ok: false,
-      message: "Say why it is moving. A handover with no reason is how context gets lost.",
-    };
-  }
-
-  const [assignee] = await db
-    .select({ id: users.id, name: users.name, active: users.active })
-    .from(users)
-    .where(eq(users.id, toUserId))
-    .limit(1);
-  if (!assignee || !assignee.active) {
-    return { ok: false, message: "That person is no longer active. Pick somebody else." };
-  }
-  if (assignee.id === contract.ownerUserId) {
-    return { ok: true, message: "They already own it." };
-  }
-
-  const previous = contract.ownerUserId;
-  await db
-    .update(contracts)
-    .set({ ownerUserId: assignee.id, updatedAt: new Date() })
-    .where(eq(contracts.id, contractId));
-
-  await db.insert(events).values({
+  const result = await handOverFor(
+    actor,
     contractId,
-    type: previous ? "owner_handover" : "owner_assigned",
-    actor: actor.id,
-    payload: {
-      fromUserId: previous,
-      toUserId: assignee.id,
-      toName: assignee.name,
-      byName: actor.name,
-      reason: reason || null,
-    },
-  });
-
-  touch(contractId);
-  return {
-    ok: true,
-    message: previous ? `Handed to ${assignee.name}.` : `Assigned to ${assignee.name}.`,
-  };
+    String(formData.get("toUserId") ?? ""),
+    String(formData.get("reason") ?? ""),
+  );
+  if (result.ok) touch(contractId);
+  return result;
 }
 
 /* ----------------------------------------------------------------- snooze */
@@ -277,49 +183,15 @@ export async function snoozeAlert(
   formData: FormData,
 ): Promise<ActionResult> {
   const actor = await requireUser();
-  const alertId = String(formData.get("alertId") ?? "");
-  const durationKey = String(formData.get("duration") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-
-  if (!reason) {
-    return { ok: false, message: "Give a reason. Snoozing without one is just hiding it." };
-  }
-  const duration = SNOOZE_DURATIONS.find((d) => d.key === durationKey);
-  if (!duration) return { ok: false, message: "Choose how long to snooze it for." };
-
-  const [alert] = await db
-    .select({
-      id: alerts.id,
-      contractId: alerts.contractId,
-      ruleKey: alerts.ruleKey,
-    })
-    .from(alerts)
-    .where(and(eq(alerts.id, alertId), isNull(alerts.resolvedAt)))
-    .limit(1);
-  if (!alert) return { ok: false, message: "That alert has already been resolved." };
-
-  const until = new Date(Date.now() + duration.hours * 3_600_000);
-
-  await db
-    .update(alerts)
-    .set({ snoozedUntil: until, snoozeReason: reason, snoozedByUserId: actor.id })
-    .where(eq(alerts.id, alertId));
-
-  await db.insert(events).values({
-    contractId: alert.contractId,
-    type: "alert_snoozed",
-    actor: actor.id,
-    payload: {
-      ruleKey: alert.ruleKey,
-      ruleLabel: RULES[alert.ruleKey as RuleKey]?.label ?? alert.ruleKey,
-      reason,
-      until: until.toISOString(),
-      untilLabel: formatPktDateTime(until),
-    },
-  });
-
-  touch(alert.contractId);
-  return { ok: true, message: `Snoozed for ${duration.label.toLowerCase()}.` };
+  const result = await snoozeAlertFor(
+    actor,
+    String(formData.get("alertId") ?? ""),
+    String(formData.get("duration") ?? ""),
+    String(formData.get("reason") ?? ""),
+  );
+  // No revalidatePath — see touch() above. Both screens that snooze an alert
+  // refresh from the client once the result lands.
+  return result;
 }
 
 export async function unsnoozeAlert(

@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { ROLE_LABELS, type Role } from "@/lib/permissions";
-import { redeemLinkCode } from "@/lib/notifications/linking";
-import { sendToChat } from "@/lib/notifications";
-import {
-  linkAlreadyUsed,
-  linkConfirmed,
-  linkExpired,
-  linkUnknownCode,
-} from "@/lib/notifications/templates";
+import { handleUpdate, type TelegramUpdate } from "@/lib/bot/handle";
+import { redact } from "@/lib/notifications/transport";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,13 +23,6 @@ function secretMatches(provided: string | null): boolean {
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
-
-type TelegramUpdate = {
-  message?: {
-    chat?: { id?: number | string };
-    text?: string;
-  };
-};
 
 export async function POST(request: Request) {
   // Fires before anything else, including verification, so the log tells us
@@ -61,57 +47,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const chatId = update.message?.chat?.id;
-  const text = (update.message?.text ?? "").trim();
-  if (chatId === undefined || !text) return NextResponse.json({ ok: true });
-
-  const chat = String(chatId);
-
-  // The only command the bot understands: /start <code>
-  const start = text.match(/^\/start(?:@\w+)?(?:\s+(\S+))?/i);
-  if (!start) {
-    await sendToChat({
-      chatId: chat,
-      template: "link_help",
-      body: "Send /start followed by the code from Settings to link your account.",
-    });
-    return NextResponse.json({ ok: true });
+  /*
+   * Every failure is swallowed and logged rather than returned.
+   *
+   * A non-200 makes Telegram redeliver the same update, backing off but never
+   * giving up, so one message the bot cannot handle would otherwise be retried
+   * for days — and each retry would run whatever part of the handler did work
+   * before the throw. Answering 200 and logging is the only safe shape here.
+   */
+  try {
+    await handleUpdate(update);
+  } catch (err) {
+    console.error(`[telegram:webhook] handler failed: ${redact(err)}`);
   }
 
-  const code = start[1];
-  if (!code) {
-    await sendToChat({
-      chatId: chat,
-      template: "link_help",
-      body: [
-        "To link your account, open Settings in the CRM and send the code",
-        "shown there like this:",
-        "",
-        "/start ABCD-2345",
-      ].join("\n"),
-    });
-    return NextResponse.json({ ok: true });
-  }
-
-  const result = await redeemLinkCode(code, chat);
-
-  const reply =
-    result.outcome === "linked"
-      ? linkConfirmed(result.name, ROLE_LABELS[result.role as Role] ?? result.role)
-      : result.outcome === "expired"
-        ? linkExpired()
-        : result.outcome === "used"
-          ? linkAlreadyUsed()
-          : linkUnknownCode();
-
-  await sendToChat({
-    chatId: chat,
-    template: reply.template,
-    body: reply.body,
-    userId: result.outcome === "linked" ? result.userId : null,
-  });
-
-  // Always 200. A non-200 makes Telegram redeliver the same update forever.
   return NextResponse.json({ ok: true });
 }
 

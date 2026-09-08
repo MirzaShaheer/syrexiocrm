@@ -3,8 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { getWeek } from "@/lib/queries/week";
 import { money, plural } from "@/lib/format";
 import { formatPktDateTime } from "@/lib/time";
-import { accountColor } from "@/lib/account-colors";
-import { BidEntry } from "@/components/bid-entry";
+import { WeekFunnel } from "@/components/week-funnel";
 import { PageHead, Panel, PanelTitle } from "@/components/shell";
 
 export const metadata = { title: "Week" };
@@ -13,11 +12,6 @@ export const dynamic = "force-dynamic";
 export default async function WeekPage() {
   await requireUser();
   const week = await getWeek();
-
-  const totalBids = week.funnel.reduce((s, f) => s + (f.bids ?? 0), 0);
-  const totalChats = week.funnel.reduce((s, f) => s + f.chatsOpened, 0);
-  const totalWon = week.funnel.reduce((s, f) => s + f.won, 0);
-  const anyBids = week.funnel.some((f) => f.bids !== null);
 
   return (
     <>
@@ -45,114 +39,34 @@ export default async function WeekPage() {
 
       {/* ---------------------------------------------------------- funnel */}
       <Panel className="mt-4">
-        <PanelTitle>How each profile is performing</PanelTitle>
+        <PanelTitle note="Pick a profile below the table to edit its row.">
+          How each profile is performing
+        </PanelTitle>
         <p className="mt-1 text-[12px] text-muted">
-          Bids are typed in — Upwork has no API for proposals or Connects.
-          Chats and contracts won are counted from the CRM.
+          Upwork has no API for proposals, chats or Connects, so every count
+          here is typed in. Approved value is the CRM&rsquo;s own figure.
         </p>
 
-        <div className="scroll-x mt-3">
-          <table className="w-full min-w-[560px] border-collapse text-[13px]">
-            <thead>
-              <tr className="border-y border-line text-left">
-                <Th>Account</Th>
-                <Th right>Bids</Th>
-                <Th right>Chats opened</Th>
-                <Th right>Won</Th>
-                <Th right>Bid to chat</Th>
-                <Th right>Chat to win</Th>
-                <Th right>Approved</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {week.funnel.map((f) => {
-                const c = accountColor(f.label);
-                const bidToChat =
-                  f.bids && f.bids > 0
-                    ? `${Math.round((f.chatsOpened / f.bids) * 100)}%`
-                    : "—";
-                const chatToWin =
-                  f.chatsOpened > 0
-                    ? `${Math.round((f.won / f.chatsOpened) * 100)}%`
-                    : "—";
-                return (
-                  <tr key={f.accountId} className="border-b border-line">
-                    <td className="py-2.5 pr-3">
-                      <Link href={`/accounts/${f.accountId}`}>
-                        <span
-                          className="inline-block w-[58px] truncate rounded-sm px-1 py-[2px] text-center text-[10.5px] font-semibold"
-                          style={{ backgroundColor: c.tint, color: c.ink }}
-                        >
-                          {f.label}
-                        </span>
-                      </Link>
-                    </td>
-                    <Td muted={f.bids === null}>
-                      {f.bids === null ? "not entered" : f.bids}
-                    </Td>
-                    <Td>{f.chatsOpened}</Td>
-                    <Td>{f.won}</Td>
-                    <Td muted={bidToChat === "—"}>{bidToChat}</Td>
-                    <Td muted={chatToWin === "—"}>{chatToWin}</Td>
-                    <Td fig>{money(f.earned)}</Td>
-                  </tr>
-                );
-              })}
-              <tr className="border-b border-line font-medium">
-                <td className="py-2.5 pr-3 text-[12px] text-muted">All four</td>
-                <Td muted={!anyBids}>{anyBids ? totalBids : "—"}</Td>
-                <Td>{totalChats}</Td>
-                <Td>{totalWon}</Td>
-                <Td muted={!anyBids || totalBids === 0}>
-                  {anyBids && totalBids > 0
-                    ? `${Math.round((totalChats / totalBids) * 100)}%`
-                    : "—"}
-                </Td>
-                <Td muted={totalChats === 0}>
-                  {totalChats > 0
-                    ? `${Math.round((totalWon / totalChats) * 100)}%`
-                    : "—"}
-                </Td>
-                <Td fig>{money(week.valueApproved)}</Td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {!anyBids ? (
-          <p className="mt-2 text-[12px] text-muted">
-            No bid counts entered for this week yet, so the conversion columns
-            are blank rather than wrong.
-          </p>
-        ) : null}
-      </Panel>
-
-      {/* ----------------------------------------------------- bid entry */}
-      <Panel className="mt-4">
-        <PanelTitle note="One number per account. Ten seconds every Monday.">
-          Bids sent this week
-        </PanelTitle>
-        <div className="mt-3">
-          <BidEntry
-            weekStartIso={week.from.toISOString()}
-            accounts={week.funnel.map((f) => ({
-              id: f.accountId,
-              label: f.label,
-              bids: f.bids,
-            }))}
-          />
-        </div>
+        <WeekFunnel
+          weekStartIso={week.from.toISOString()}
+          rows={week.funnel}
+          trash={week.trash}
+          valueApproved={week.valueApproved}
+        />
       </Panel>
 
       {/* ---------------------------------------------------------- people */}
       <Panel className="mt-4">
-        <PanelTitle>Updates posted, per person</PanelTitle>
+        <PanelTitle note="Every update on record, not only this week's.">
+          Updates posted, per person
+        </PanelTitle>
         <div className="scroll-x mt-3">
-          <table className="w-full min-w-[420px] border-collapse text-[13px]">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
             <thead>
               <tr className="border-y border-line text-left">
                 <Th>Person</Th>
-                <Th right>Updates</Th>
+                <Th right>Updates, all time</Th>
+                <Th right>This week</Th>
                 <Th right>Contracts</Th>
                 <Th right>Alerts raised</Th>
               </tr>
@@ -169,6 +83,7 @@ export default async function WeekPage() {
                     </Link>
                   </td>
                   <Td muted={p.updates === 0}>{p.updates}</Td>
+                  <Td muted={p.updatesThisWeek === 0}>{p.updatesThisWeek}</Td>
                   <Td>{p.contractsOwned}</Td>
                   <Td tone={p.alertsOpened > 0 ? "late" : undefined}>
                     {p.alertsOpened}

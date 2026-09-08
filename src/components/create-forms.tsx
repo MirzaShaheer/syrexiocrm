@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRefreshOnSuccess } from "@/components/use-refresh-on-success";
 import type { ActionResult } from "@/lib/actions/contracts";
 import {
   addMilestone,
@@ -266,6 +267,7 @@ export function ActivityButtons({ contractId }: { contractId: string }) {
     markActivity,
     null,
   );
+  useRefreshOnSuccess(state);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -303,6 +305,7 @@ export function AddMilestone({ contractId }: { contractId: string }) {
     addMilestone,
     null,
   );
+  useRefreshOnSuccess(state);
   const ref = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -379,6 +382,7 @@ export function MilestoneStatus({
     setMilestoneStatus,
     null,
   );
+  useRefreshOnSuccess(state);
   const ref = useRef<HTMLFormElement>(null);
 
   return (

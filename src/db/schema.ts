@@ -343,8 +343,16 @@ export const alerts = pgTable(
     ruleKey: text().notNull(),
     openedAt: now().notNull().defaultNow(),
     resolvedAt: now(),
-    /** Set once, on first notification. Null while queued for morning. */
+    /** Set once, on first notification. Null while held for the evening. */
     notifiedAt: now(),
+    /**
+     * The nag clock. An alert nobody answers is re-sent every four hours to
+     * the whole team until it resolves or somebody snoozes it, so this moves
+     * every time it goes out — unlike `notifiedAt`, which is stamped once and
+     * is what stops the first message being sent twice.
+     */
+    lastNudgedAt: now(),
+    nudgeCount: numeric({ precision: 4, scale: 0 }).notNull().default("0"),
     /**
      * Snooze. Real life has clients on holiday and jobs paused for a week.
      * A snoozed alert stays open but drops off the board until this passes.
@@ -366,6 +374,7 @@ export const alerts = pgTable(
     index("alerts_rule_idx").on(t.ruleKey, t.openedAt),
     index("alerts_unnotified_idx").on(t.notifiedAt),
     index("alerts_snoozed_idx").on(t.snoozedUntil),
+    index("alerts_nudge_idx").on(t.lastNudgedAt),
   ],
 );
 
@@ -396,6 +405,66 @@ export const telegramLinkCodes = pgTable(
   ],
 );
 
+/* ----------------------------------------------------------- bot cursors */
+
+/**
+ * How far the bot has got through something it reads in order.
+ *
+ * Currently one row: the last event announced in the team group. Without it
+ * the cron would either re-announce the same handover every fifteen minutes or
+ * guess from a time window, and a time window quietly loses anything written
+ * during a slow run.
+ */
+export const botCursors = pgTable("bot_cursors", {
+  key: text().primaryKey(),
+  value: text().notNull(),
+  updatedAt: now().notNull().defaultNow(),
+});
+
+/* ------------------------------------------------------------ bot prompts */
+
+/**
+ * What the bot is waiting to hear back about.
+ *
+ * Telegram has no notion of a conversation state, so when the bot asks "what
+ * is the next action?" it has to remember which contract it asked about. The
+ * question is sent with a force-reply, and the answer arrives quoting that
+ * message id — which is the only thing tying the two together.
+ *
+ * Short-lived on purpose. A reply to a question from three days ago is not an
+ * answer, it is a stray message, and writing it to a contract would be worse
+ * than ignoring it.
+ */
+export const botPrompts = pgTable(
+  "bot_prompts",
+  {
+    id: id(),
+    chatId: text().notNull(),
+    /** The message id of the bot question this is an answer to. */
+    messageId: text().notNull(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** What the answer will be used for: next_action, update, note, bids. */
+    kind: text().notNull(),
+    contractId: uuid().references(() => contracts.id, { onDelete: "cascade" }),
+    accountId: uuid().references(() => accounts.id, { onDelete: "cascade" }),
+    alertId: uuid().references(() => alerts.id, { onDelete: "set null" }),
+    /**
+     * Anything else the answer needs that will not fit in a callback: the
+     * snooze duration already chosen, the week a bid count belongs to.
+     */
+    payload: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    expiresAt: now().notNull(),
+    answeredAt: now(),
+    createdAt: now().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("bot_prompts_message_idx").on(t.chatId, t.messageId),
+    index("bot_prompts_expiry_idx").on(t.expiresAt),
+  ],
+);
+
 /* ---------------------------------------------------------- notifications */
 
 /**
@@ -416,11 +485,20 @@ export const notifications = pgTable(
     template: text().notNull(),
     /** The exact text sent. Plain text, never markdown. */
     body: text().notNull(),
+    /**
+     * The buttons that went out under it. Stored because a message held
+     * through the day is sent hours later by a different process, and an
+     * alert that arrives without its buttons is back to being a thing you
+     * can only act on from a laptop.
+     */
+    keyboard: jsonb().$type<{ text: string; data: string }[][]>(),
     /** Telegram chat id at send time, or null when the person is unlinked. */
     chatId: text(),
+    /** Telegram's id for the sent message, so it can be edited afterwards. */
+    messageId: text(),
 
     status: notificationStatusEnum().notNull().default("queued"),
-    /** Held here while it waits out the 11pm to 8am quiet window. */
+    /** Held here while it waits out the 6am to 6pm hold window. */
     scheduledFor: now(),
     sentAt: now(),
     attempts: numeric({ precision: 4, scale: 0 }).notNull().default("0"),
@@ -439,10 +517,13 @@ export const notifications = pgTable(
 /* ------------------------------------------------------------ bid counts */
 
 /**
- * Upwork exposes no proposal or Connects data through any API, so bids cannot
- * be read — only typed. Deliberately one row per account per week rather than
- * one row per bid: four numbers on a Monday is a habit people keep, and a
- * per-bid log is one nobody sustains past a fortnight.
+ * Upwork exposes no proposal or Connects data through any API, so the funnel
+ * cannot be read — only typed. Deliberately one row per account per week
+ * rather than one row per bid: a handful of numbers on a Monday is a habit
+ * people keep, and a per-bid log is one nobody sustains past a fortnight.
+ *
+ * Every count except bids is nullable, so "nobody entered it" stays
+ * distinguishable from "it was genuinely zero".
  */
 export const bidWeeks = pgTable(
   "bid_weeks",
@@ -454,6 +535,14 @@ export const bidWeeks = pgTable(
     /** Monday of the week, at 00:00 Pakistan time. */
     weekStart: now().notNull(),
     bids: numeric({ precision: 5, scale: 0 }).notNull().default("0"),
+    /** Proposals that got a reply. */
+    chatsOpened: numeric({ precision: 5, scale: 0 }),
+    /** Chats that turned into a signed contract. */
+    contracted: numeric({ precision: 5, scale: 0 }),
+    /** Contracts finished and closed out this week. */
+    closed: numeric({ precision: 5, scale: 0 }),
+    /** Proposals pulled back, by either side, before a contract existed. */
+    withdrawn: numeric({ precision: 5, scale: 0 }),
     connectsSpent: numeric({ precision: 6, scale: 0 }),
     enteredByUserId: uuid().references(() => users.id, { onDelete: "set null" }),
     createdAt: now().notNull().defaultNow(),
@@ -462,6 +551,39 @@ export const bidWeeks = pgTable(
   (t) => [
     uniqueIndex("bid_weeks_account_week_idx").on(t.accountId, t.weekStart),
     index("bid_weeks_week_idx").on(t.weekStart),
+  ],
+);
+
+/**
+ * Deleted count rows, kept whole for thirty days.
+ *
+ * A separate table rather than a deleted_at flag on bid_weeks: the live table
+ * is unique on (account, week), so a soft-deleted row would block the next
+ * person typing that same slot. Moving the row out leaves the slot free and
+ * makes the purge a delete from one table that cannot touch live data.
+ */
+export const bidWeekTrash = pgTable(
+  "bid_week_trash",
+  {
+    id: id(),
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    weekStart: now().notNull(),
+    /* The counts exactly as they stood, so a restore is a straight put-back. */
+    bids: numeric({ precision: 5, scale: 0 }).notNull().default("0"),
+    chatsOpened: numeric({ precision: 5, scale: 0 }),
+    contracted: numeric({ precision: 5, scale: 0 }),
+    closed: numeric({ precision: 5, scale: 0 }),
+    withdrawn: numeric({ precision: 5, scale: 0 }),
+    /** Whoever typed the numbers originally, kept through the round trip. */
+    enteredByUserId: uuid().references(() => users.id, { onDelete: "set null" }),
+    deletedByUserId: uuid().references(() => users.id, { onDelete: "set null" }),
+    deletedAt: now().notNull().defaultNow(),
+  },
+  (t) => [
+    index("bid_week_trash_deleted_idx").on(t.deletedAt),
+    index("bid_week_trash_slot_idx").on(t.accountId, t.weekStart),
   ],
 );
 
@@ -502,4 +624,5 @@ export type Alert = typeof alerts.$inferSelect;
 export type SyncRun = typeof syncRuns.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type BidWeek = typeof bidWeeks.$inferSelect;
+export type BidWeekTrash = typeof bidWeekTrash.$inferSelect;
 export type TelegramLinkCode = typeof telegramLinkCodes.$inferSelect;

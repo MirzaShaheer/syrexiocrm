@@ -191,6 +191,7 @@ export async function findFinalHourDeadlines(): Promise<
     accountLabel: string;
     ownerUserId: string | null;
     ownerName: string | null;
+    milestoneId: string;
     milestoneTitle: string;
     minutesLeft: number;
   }[]
@@ -202,6 +203,7 @@ export async function findFinalHourDeadlines(): Promise<
     account_label: string;
     owner_user_id: string | null;
     owner_name: string | null;
+    milestone_id: string;
     milestone_title: string;
     minutes_left: string;
   }>(sql`
@@ -209,7 +211,7 @@ export async function findFinalHourDeadlines(): Promise<
       c.id as contract_id, c.title as contract_title,
       cl.name as client_name, a.label as account_label,
       c.owner_user_id, u.name as owner_name,
-      m.title as milestone_title,
+      m.id as milestone_id, m.title as milestone_title,
       round(extract(epoch from (m.due_at - now())) / 60) as minutes_left
     from milestones m
     join contracts c on c.id = m.contract_id
@@ -238,6 +240,7 @@ export async function findFinalHourDeadlines(): Promise<
     accountLabel: r.account_label,
     ownerUserId: r.owner_user_id,
     ownerName: r.owner_name,
+    milestoneId: r.milestone_id,
     milestoneTitle: r.milestone_title,
     minutesLeft: Number(r.minutes_left),
   }));

@@ -8,8 +8,15 @@ import {
   findFinalHourDeadlines,
   runAlertEngine,
 } from "@/lib/alerts/engine";
-import { flushQueued, notify } from "@/lib/notifications";
-import { alertOpened, finalHour } from "@/lib/notifications/templates";
+import { runNudges } from "@/lib/alerts/escalation";
+import { alertCard } from "@/lib/bot/cards";
+import { encode } from "@/lib/bot/callbacks";
+import { announceToGroup } from "@/lib/bot/group";
+import { sweepPrompts } from "@/lib/bot/prompts";
+import { runScheduled } from "@/lib/bot/schedule";
+import { flushQueued, notify, sendToGroup } from "@/lib/notifications";
+import { purgeWeekCountsTrash } from "@/lib/trash";
+import { finalHour } from "@/lib/notifications/templates";
 import { RULES } from "@/lib/alert-rules";
 
 export const runtime = "nodejs";
@@ -20,11 +27,15 @@ export const maxDuration = 60;
  * The clock the whole product runs on. Point a scheduler at this every
  * fifteen minutes with the shared secret in the Authorization header.
  *
- * It does four things, in order:
+ * In order:
  *   1. recompute every alert rule, opening and resolving
- *   2. message the owner about anything newly opened, once
- *   3. escalate any deadline inside the final hour, through quiet hours
- *   4. release anything that was held overnight
+ *   2. message the owner about anything newly opened, once, with buttons
+ *   3. re-send anything still unanswered after four hours, to everyone
+ *   4. escalate any deadline inside the final hour, through the sleep window
+ *   5. run whatever the clock says is due — briefs, sweeps, Monday prompts
+ *   6. announce the night's events in the team group
+ *   7. release anything held while the team was asleep, and tidy up —
+ *      which includes erasing count rows that have sat in the trash 30 days
  */
 function authorised(request: Request): boolean {
   const expected = process.env.CRON_SECRET;
@@ -57,6 +68,7 @@ export async function POST(request: Request) {
   let notified = 0;
   let skipped = 0;
   let failed = 0;
+  let unowned = 0;
 
   if (!silent && engine.opened.length) {
     const targets = await describeAlertTargets(
@@ -64,35 +76,52 @@ export async function POST(request: Request) {
     );
 
     for (const t of targets) {
-      // Nobody owns it: there is no one person to tell. It still shows on
-      // Today, which is where an unowned contract belongs.
-      if (!t.ownerUserId) {
-        skipped++;
-        continue;
-      }
-
-      const { template, body } = alertOpened({
-        ruleLabel: RULES[t.ruleKey].label,
+      const card = alertCard({
+        alertId: t.alertId,
+        ruleKey: t.ruleKey,
+        contractId: t.contractId,
         contractTitle: t.contractTitle,
         clientName: t.clientName,
         accountLabel: t.accountLabel,
         ownerName: t.ownerName,
-        contractId: t.contractId,
       });
+
+      /*
+       * Nobody owns it, so there is no one person to tell — which used to mean
+       * telling nobody at all. An unowned contract is the exact failure the
+       * product exists to remove, so it goes to the group, where the card's
+       * "I'll take it" button makes claiming it a single tap.
+       */
+      if (!t.ownerUserId) {
+        await sendToGroup({
+          template: "alert_opened_unowned",
+          body: card.body,
+          contractId: t.contractId,
+          alertId: t.alertId,
+          keyboard: card.keyboard,
+        });
+        await db
+          .update(alerts)
+          .set({ notifiedAt: new Date() })
+          .where(and(eq(alerts.id, t.alertId), isNull(alerts.notifiedAt)));
+        unowned++;
+        continue;
+      }
 
       const outcome = await notify({
         userId: t.ownerUserId,
-        template,
-        body,
+        template: "alert_opened",
+        body: card.body,
+        keyboard: card.keyboard,
         contractId: t.contractId,
         alertId: t.alertId,
         // A rule counting down to a deadline goes out whatever the hour;
-        // everything else waits for the morning. The rule decides, not this
+        // everything else waits for the shift. The rule decides, not this
         // loop, so the answer is the same everywhere it is asked.
         immediate: RULES[t.ruleKey].bypassQuietHours,
       });
 
-      // Stamped whether it went out or was queued, so it is never sent twice.
+      // Stamped whether it went out or was held, so it is never sent twice.
       await db
         .update(alerts)
         .set({ notifiedAt: new Date() })
@@ -103,6 +132,9 @@ export async function POST(request: Request) {
       else skipped++;
     }
   }
+
+  /* ---------------------------------- re-send anything still unanswered */
+  const nudges = silent ? { nudged: 0, messages: 0 } : await runNudges();
 
   /* --------------------------------------------------------- final hour */
   let escalated = 0;
@@ -124,13 +156,27 @@ export async function POST(request: Request) {
         body,
         contractId: d.contractId,
         immediate: true,
+        // The one button that answers this message, when we know the
+        // milestone it is counting down.
+        keyboard: d.milestoneId
+          ? [[{ text: "✓ Submitted", data: encode("msub", d.milestoneId) }]]
+          : undefined,
       });
       if (outcome.status === "sent") escalated++;
     }
   }
 
-  /* ---------------------------------------- release anything held overnight */
+  /* -------------------------------------------- whatever the clock says */
+  const scheduled = silent
+    ? { briefs: 0, sweeps: 0, bidPrompts: 0, reports: 0 }
+    : await runScheduled();
+
+  const group = silent ? { posted: 0 } : await announceToGroup();
+
+  /* ------------------------------ release anything held, then tidy up */
   const flushed = await flushQueued();
+  const promptsSwept = await sweepPrompts();
+  const trashPurged = await purgeWeekCountsTrash();
 
   const { rows: pending } = await db.execute<{ count: string }>(
     sql`select count(*) as count from ${notifications} where status = 'queued'`,
@@ -144,10 +190,17 @@ export async function POST(request: Request) {
     alertsOpened: engine.opened.length,
     alertsResolved: engine.resolved,
     notified,
+    unowned,
     skipped,
     failed,
+    nudged: nudges.nudged,
+    nudgeMessages: nudges.messages,
     escalated,
+    ...scheduled,
+    groupPosts: group.posted,
     flushed,
+    promptsSwept,
+    trashPurged,
     stillQueued: Number(pending[0]?.count ?? 0),
   });
 }

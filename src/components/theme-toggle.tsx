@@ -14,7 +14,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const current = document.documentElement.getAttribute("data-theme");
-    setTheme(current === "dark" ? "dark" : "light");
+    setTheme(current === "light" ? "light" : "dark");
   }, []);
 
   function toggle() {
@@ -51,13 +51,12 @@ export const themeBootScript = `
 (function () {
   try {
     var stored = localStorage.getItem('crm-theme');
-    var system = window.matchMedia('(prefers-color-scheme: dark)').matches;
     var theme = stored === 'dark' || stored === 'light'
       ? stored
-      : (system ? 'dark' : 'light');
+      : 'dark';
     document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
 })();
 `;

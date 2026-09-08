@@ -11,7 +11,8 @@
  *     Upwork profiles are running.
  */
 
-function appUrl(): string {
+/** Exported because the bot writes messages of its own, in lib/bot. */
+export function appUrl(): string {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
@@ -35,7 +36,10 @@ export const linkConfirmed = (name: string, role: string) => ({
     `Linked. You are signed in as ${name} (${role}).`,
     "",
     "You will get a message here when something on your contracts needs you,",
-    "and nothing between 11pm and 8am Pakistan time.",
+    "during the 6pm to 6am shift. Anything raised while you are asleep is",
+    "held and delivered at 6pm, except a deadline inside the hour.",
+    "",
+    "Send /help to see what you can do from here.",
     "",
     appUrl(),
   ].join("\n"),
