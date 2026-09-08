@@ -56,7 +56,7 @@ pick it up for free.
 ## Stack
 
 Next.js 15 (App Router, server actions) · PostgreSQL + Drizzle ORM ·
-Tailwind CSS v4 · session-cookie auth with seeded users · Railway.
+Tailwind CSS v4 · session-cookie auth with seeded users · Vercel.
 
 No Redis, no queue, no job runner. A cron route plus webhooks is enough at
 20–30 active contracts.
@@ -90,7 +90,8 @@ bash scripts/pg.sh stop
 bash scripts/pg.sh psql
 ```
 
-That server is a dev convenience only. Production is Railway Postgres.
+That server is a dev convenience only. Production is a hosted Postgres reached
+from Vercel over a pooled connection string.
 
 ## Scripts
 
@@ -125,13 +126,35 @@ drizzle/                generated migrations, committed
 
 ### One trap worth knowing
 
-**Do not call `revalidatePath` from a server action that a form on the same
-screen invokes.** Next re-renders the current route into the action response
-and, in this app, that render never finishes: `useActionState` never settles
-and the button sits on "Saving…" forever. Every form here refreshes from the
-client with `router.refresh()` once its result lands. See
-`src/lib/actions/history.ts` and `useRefreshOnSuccess` in
-`src/components/contract-forms.tsx`.
+**A server action that a form on the screen invokes must not call
+`revalidatePath` at all** — not for the current route, and not for any other
+route either. Next attaches a re-render of the current tree to the action
+response, the client never applies it, `useActionState` never settles, and the
+button sits on "Saving…" for ever. The server is not the problem: it finishes
+the work and answers 200 with a complete, valid payload in about 110ms.
+
+Measured on a clean production build, posting an update on `/contracts/[id]`:
+
+| `revalidatePath` in the action | Hung |
+|---|---|
+| `"/today"` and `"/"` | 10 / 10 |
+| `"/today"` only | 10 / 10 |
+| `"/"` only | 10 / 10 |
+| none | 0 / 10 |
+
+Only production is affected; `next dev` settles every time, which is what makes
+this so easy to reintroduce.
+
+So actions revalidate nothing and return their result, and the screen refreshes
+itself with `useRefreshOnSuccess` (`src/components/use-refresh-on-success.ts`)
+once that result lands. Every other screen is dynamic, so navigating to one
+refetches it anyway. An action that ends in `redirect()` is the one exception —
+the response is a redirect, so it may still revalidate.
+
+**Still open:** the same failure affects the forms on `/today` (bulk assign),
+and there it is *not* caused by `revalidatePath` — an action that returns
+immediately, touching neither the database nor the cache, still hangs on that
+screen. That one is unsolved and predates this fix.
 
 ## Interface
 
@@ -292,6 +315,41 @@ itself. Miss any one and Settings shows "Test mode" and no webhook is
 registered. Leave `TELEGRAM_FORCE_IPV6` unset on a host — it exists for
 networks that filter Telegram's IPv4 range.
 
+#### On Vercel specifically
+
+`src/instrumentation.ts` registers the webhook at server start, which on a
+long-running server means once. Vercel has no such moment: `register()` runs on
+each **cold start** of a serverless instance, so it does not run at deploy time
+at all — it runs when the first request arrives, and again after every scale to
+zero.
+
+Two consequences.
+
+**Scope the Telegram variables to Production.** Vercel applies environment
+variables to Preview and Development too unless told otherwise, and every
+preview deployment runs the same registration code. One request to a preview
+URL would repoint the live bot at that preview and production would go quiet —
+no error, nothing in the log, just a bot that stopped answering. `register()`
+now refuses to touch the webhook whenever `VERCEL_ENV` is anything but
+`production`, so forgetting is survivable, but scoping is the actual fix.
+
+**Register it yourself after a deploy** rather than waiting for a cold start:
+
+```bash
+curl -sS "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://syrexiocrm.vercel.app/api/telegram/webhook",
+       "secret_token":"'"$TELEGRAM_WEBHOOK_SECRET"'",
+       "allowed_updates":["message","callback_query"]}'
+```
+
+`allowed_updates` must list **`callback_query`**. Without it Telegram accepts
+every button press and silently delivers none of them, which looks exactly like
+buttons that do nothing. Check what is actually registered with `getWebhookInfo`.
+
+`APP_URL` must be the stable production domain. Vercel's own `VERCEL_URL` is
+per-deployment, so a deep link built from it rots the moment you redeploy.
+
 ### The alert engine needs a scheduler
 
 `/api/cron/alerts` is the clock the product runs on: it recomputes every rule,
@@ -341,6 +399,13 @@ hides controls on a screen, it does not grant or withhold anything. The threat
 it answers is somebody glancing at the screen in an open-plan office, not
 somebody holding the session. Anyone who can read the page's data can see what
 it hides.
+
+While it is on the interface says so in three places at once: a brand rail
+across the very top of the window, the header chip switching to the brand
+accent and naming the role, and a ring around each panel that is only there
+because of it. Toggling also flashes "Owner mode on" or "off" in the bottom
+right for a second — bottom right rather than beside the trigger, because the
+header wraps to two and three rows as the window narrows.
 
 Kept in React state on purpose: nothing is written to storage, so there is no
 flag that can get stuck on, no cookie to go stale, and a refresh is always the

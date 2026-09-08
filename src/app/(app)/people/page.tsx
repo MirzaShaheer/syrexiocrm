@@ -34,7 +34,9 @@ export default async function PeoplePage() {
               <Th>Telegram</Th>
               {isOwner(actor) ? (
                 <OwnerOnly>
-                  <Th>Access</Th>
+                  <Th>
+                    <span className="text-brand">Access</span>
+                  </Th>
                 </OwnerOnly>
               ) : null}
             </tr>

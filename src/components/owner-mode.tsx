@@ -46,6 +46,9 @@ export function useOwnerMode(): OwnerModeValue {
   return useContext(OwnerModeContext);
 }
 
+/** How long the confirmation stays on screen. */
+const TOAST_MS = 1000;
+
 export function OwnerModeProvider({
   canUnlock,
   children,
@@ -54,11 +57,33 @@ export function OwnerModeProvider({
   children: React.ReactNode;
 }) {
   const [on, setOn] = useState(false);
+  /** Carries an id as well as text, so toggling twice quickly restarts the
+   *  timer rather than letting the second message inherit the first's. */
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
+
+  // A ref mirrors the state so `toggle` can read the current value without
+  // computing the message inside a state updater, which React is free to run
+  // twice.
+  const onRef = useRef(false);
+  const toastId = useRef(0);
 
   const toggle = useCallback(() => {
     if (!canUnlock) return;
-    setOn((v) => !v);
+    const next = !onRef.current;
+    onRef.current = next;
+    setOn(next);
+    toastId.current += 1;
+    setToast({
+      text: next ? "Owner mode on" : "Owner mode off",
+      id: toastId.current,
+    });
   }, [canUnlock]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), TOAST_MS);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   /*
     Server and client both start at `false`, so the first paint matches the
@@ -68,6 +93,23 @@ export function OwnerModeProvider({
   return (
     <OwnerModeContext.Provider value={{ on, canUnlock, toggle }}>
       {children}
+      {toast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          /*
+            Bottom right, not beside the trigger. The header wraps to two and
+            three rows as the window narrows, and a pill pinned to the top
+            corner would sit on top of Sign out at exactly the widths nobody
+            tests. The rail and the chip already confirm the change where the
+            eye is; this is the words.
+          */
+          className="num pointer-events-none fixed right-4 bottom-4 z-50 rounded-full border border-brand/40 bg-raised px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-brand uppercase"
+          style={{ boxShadow: "var(--shadow-md)" }}
+        >
+          {toast.text}
+        </div>
+      ) : null}
     </OwnerModeContext.Provider>
   );
 }
@@ -86,6 +128,72 @@ export function OwnerHidden({ children }: { children: React.ReactNode }) {
   const { on } = useOwnerMode();
   if (on) return null;
   return <>{children}</>;
+}
+
+/**
+ * The rail along the very top of the window while owner mode is on.
+ *
+ * The one signal that is impossible to miss and impossible to mistake for
+ * data: it sits above the header, spans the full width, and uses the brand
+ * accent rather than the alert palette — red, amber and green each mean one
+ * thing in this product and none of them is "you have more buttons than
+ * usual".
+ */
+export function OwnerModeRail() {
+  const { on } = useOwnerMode();
+  if (!on) return null;
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[3px]"
+      style={{
+        background:
+          "linear-gradient(90deg, transparent, var(--brand) 12%, var(--brand) 88%, transparent)",
+        boxShadow: "0 0 12px 0 var(--brand)",
+      }}
+    />
+  );
+}
+
+/**
+ * The signed-in chip. Just a name normally; while owner mode is on it takes
+ * the brand accent and says so in small mono caps, so the state is legible
+ * from across a desk without reading anything.
+ */
+export function OwnerChip({
+  name,
+  roleLabel,
+  elevated,
+}: {
+  name: string;
+  roleLabel: string;
+  elevated: boolean;
+}) {
+  const { on } = useOwnerMode();
+
+  return (
+    <span
+      className={`hidden items-baseline gap-1.5 rounded-sm border px-2 py-1.5 leading-none transition-colors lg:flex ${
+        on
+          ? "border-brand/50 bg-brand/10 text-brand"
+          : "border-line bg-raised text-muted"
+      }`}
+    >
+      <span className={on ? "font-medium text-brand" : "font-medium text-ink-2"}>
+        {name}
+      </span>
+      {on ? (
+        <span className="num text-[10px] font-semibold tracking-[0.14em] text-brand uppercase">
+          {roleLabel}
+        </span>
+      ) : null}
+      {elevated ? (
+        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-2">
+          elevated
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 /** How long a run of clicks stays a run. Comfortable, not fussy. */
@@ -140,9 +248,14 @@ export function OwnerModeTrigger() {
       // Present for everyone, so its absence never reveals who the owner is.
       // `select-none` stops a triple click painting a selection across the
       // header, which is the one visible tell this would otherwise have.
-      className={`h-6 w-6 shrink-0 cursor-default rounded-sm select-none ${
-        on ? "bg-brand/25" : "bg-transparent"
-      }`}
-    />
+      className="flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-sm select-none"
+    >
+      {/* A single lit dot while unlocked. Invisible the rest of the time. */}
+      <span
+        className={`block size-[5px] rounded-full transition-opacity ${
+          on ? "bg-brand opacity-100" : "opacity-0"
+        }`}
+      />
+    </button>
   );
 }

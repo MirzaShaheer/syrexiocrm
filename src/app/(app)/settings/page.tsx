@@ -129,7 +129,7 @@ export default async function SettingsPage() {
       {/* ------------------------------------------------------------ admin */}
       {admin ? (
         <OwnerOnly>
-          <Panel className="mt-4">
+          <Panel className="mt-4 ring-1 ring-brand/25">
             <PanelTitle note={`${linkedCount} of ${team.length} linked`}>
               Who is linked · owner only
             </PanelTitle>
@@ -175,7 +175,7 @@ export default async function SettingsPage() {
             ) : null}
           </Panel>
 
-          <Panel className="mt-4">
+          <Panel className="mt-4 ring-1 ring-brand/25">
             <PanelTitle note="What fired, what failed, and why">
               Recent notifications · owner only
             </PanelTitle>
@@ -225,7 +225,7 @@ export default async function SettingsPage() {
             )}
           </Panel>
 
-          <Panel className="mt-4">
+          <Panel className="mt-4 ring-1 ring-brand/25">
             <PanelTitle>Upwork accounts · owner only</PanelTitle>
             <p className="mt-2 text-[13px] text-ink-2">
               Contracts are entered by hand — there is no Upwork API connection,

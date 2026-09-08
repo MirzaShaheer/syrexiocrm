@@ -8,9 +8,10 @@ import { Nav } from "@/components/nav";
 import { Search } from "@/components/search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
+  OwnerChip,
   OwnerModeProvider,
+  OwnerModeRail,
   OwnerModeTrigger,
-  OwnerOnly,
 } from "@/components/owner-mode";
 import { ROLE_LABELS, hasLiveAdminGrant, isOwner } from "@/lib/permissions";
 
@@ -31,6 +32,7 @@ export default async function AppLayout({
 
   return (
     <OwnerModeProvider canUnlock={isOwner(user)}>
+    <OwnerModeRail />
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-line bg-raised/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-2.5 sm:px-6">
@@ -74,22 +76,17 @@ export default async function AppLayout({
             </Link>
 
             {/*
-              Just the name. No role for anyone, so no screen advertises whose
-              account can do more than anyone else's — the role is still on the
-              People page, where it is a fact about the team rather than a
-              label on the person holding the laptop.
+              Just the name normally. No role for anyone, so no screen
+              advertises whose account can do more than anyone else's — the
+              role is still on the People page, where it is a fact about the
+              team rather than a label on the person holding the laptop. In
+              owner mode the chip takes the brand accent and names the role.
             */}
-            <span className="hidden items-baseline gap-1.5 rounded-sm border border-line bg-raised px-2 py-1.5 leading-none lg:flex">
-              <span className="font-medium text-ink-2">{user.name}</span>
-              <OwnerOnly>
-                <span className="text-muted">{ROLE_LABELS[user.role]}</span>
-              </OwnerOnly>
-              {elevated ? (
-                <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-2">
-                  elevated
-                </span>
-              ) : null}
-            </span>
+            <OwnerChip
+              name={user.name}
+              roleLabel={ROLE_LABELS[user.role]}
+              elevated={elevated}
+            />
 
             <form action={signOut}>
               <button
