@@ -217,3 +217,35 @@ The deployment needs `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`,
 itself. Miss any one and Settings shows "Test mode" and no webhook is
 registered. Leave `TELEGRAM_FORCE_IPV6` unset on a host — it exists for
 networks that filter Telegram's IPv4 range.
+
+### The alert engine needs a scheduler
+
+`/api/cron/alerts` is the clock the product runs on: it recomputes every rule,
+messages the owner of anything newly late, escalates deadlines inside their
+final hour, and releases what was held overnight. Nothing in the app calls it.
+Without a scheduler the board freezes at whatever it looked like on the last
+page load, and Telegram never fires.
+
+Vercel's Hobby plan allows a cron **one run per day**, which is useless for a
+product whose job is telling you something is late, so the schedule lives in
+GitHub Actions instead: `.github/workflows/alerts.yml`, every 15 minutes.
+
+Two things must match:
+
+| Where | Name | Value |
+|---|---|---|
+| Vercel → Environment Variables | `CRON_SECRET` | the shared secret |
+| GitHub → Settings → Secrets and variables → Actions | `CRON_SECRET` | the same string |
+
+Mismatch and every run fails with a 403, loudly, in the Actions tab — a cron
+that fails silently is worse than none, because the board looks calm while
+nothing is being recomputed.
+
+**Run it silently the first time.** Actions → Alert engine → Run workflow, with
+`silent` ticked. That opens alerts for everything already late without
+messaging anyone, so nobody wakes up to a dozen notifications about problems
+that are days old. Every run after that notifies normally.
+
+Two GitHub caveats: scheduled runs are queued and can be a few minutes late
+under load (harmless — the thresholds are hours), and GitHub disables schedules
+on a repository with no activity for 60 days.

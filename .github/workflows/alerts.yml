@@ -1,0 +1,74 @@
+# The clock the product runs on.
+#
+# /api/cron/alerts recomputes every alert rule, messages the owner of anything
+# newly late, escalates deadlines inside their final hour, and releases what
+# was held overnight. Nothing in the app calls it — without a scheduler the
+# board freezes at whatever it looked like on the last page load.
+#
+# This lives in GitHub Actions rather than in vercel.json because the project
+# is on Vercel's Hobby plan, which allows a cron one run per day. Once an hour
+# would be useless for a product whose job is telling you something is late.
+#
+# Set-up: one repository secret, CRON_SECRET, matching the environment
+# variable of the same name in Vercel.
+
+name: Alert engine
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub queues scheduled runs and can be a few minutes
+    # late under load, which is fine here: the thresholds are hours, not
+    # minutes, and the final-hour escalation re-checks on every run.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      silent:
+        description: "Open alerts without messaging anyone (use for the first run)"
+        type: boolean
+        default: false
+
+# A run that overlaps the previous one would double-message. Let the older one
+# finish and drop anything queued behind it — the next tick is 15 minutes away.
+concurrency:
+  group: alert-engine
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Recompute alerts and send what is due
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: https://syrexiocrm.vercel.app
+          SILENT: ${{ inputs.silent && 'true' || 'false' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+          url="$APP_URL/api/cron/alerts"
+          if [ "$SILENT" = "true" ]; then
+            url="$url?silent=true"
+            echo "Silent run: alerts will open without notifying anyone."
+          fi
+
+          code=$(curl -sS --max-time 120 \
+            -o response.json -w '%{http_code}' \
+            -X POST "$url" \
+            -H "Authorization: Bearer $CRON_SECRET")
+
+          echo "HTTP $code"
+          cat response.json 2>/dev/null || true
+          echo
+
+          # A cron that fails silently is worse than no cron: the board looks
+          # calm because nothing is being recomputed. Fail the run loudly so
+          # it shows up in the Actions tab.
+          case "$code" in
+            200) echo "::notice::Alert engine ran." ;;
+            403) echo "::error::403 — CRON_SECRET here does not match the one in Vercel."; exit 1 ;;
+            *)   echo "::error::Alert engine returned HTTP $code"; exit 1 ;;
+          esac
