@@ -5,6 +5,7 @@ import { isOwner, ROLE_LABELS, type Role } from "@/lib/permissions";
 import { formatPktDateTime } from "@/lib/time";
 import { AdminGrant } from "@/components/admin-grant";
 import { PageHead, Panel } from "@/components/shell";
+import { OwnerHidden, OwnerOnly } from "@/components/owner-mode";
 
 export const metadata = { title: "People" };
 export const dynamic = "force-dynamic";
@@ -31,7 +32,11 @@ export default async function PeoplePage() {
               <Th right>Awaiting reply</Th>
               <Th right>Updates this week</Th>
               <Th>Telegram</Th>
-              {isOwner(actor) ? <Th>Access</Th> : null}
+              {isOwner(actor) ? (
+                <OwnerOnly>
+                  <Th>Access</Th>
+                </OwnerOnly>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -77,6 +82,7 @@ export default async function PeoplePage() {
                     </span>
                   </td>
                   {isOwner(actor) ? (
+                    <OwnerOnly>
                     <td className="py-2.5 pr-3">
                       {p.id === actor.id ? (
                         <span className="text-[12px] text-muted">owner</span>
@@ -90,6 +96,7 @@ export default async function PeoplePage() {
                         />
                       )}
                     </td>
+                    </OwnerOnly>
                   ) : null}
                 </tr>
               );
@@ -104,19 +111,27 @@ export default async function PeoplePage() {
           yardstick, not a target — a contract that genuinely had no movement is
           better served by an honest silence than a filler line.
         </p>
-        {isOwner(actor) ? (
-          <p className="mt-2 max-w-3xl text-[12px] text-muted">
-            The Access column is yours alone. A grant lets someone edit records
-            they did not create, expires on its own, and is written to the audit
-            log both when you give it and when you take it back.
-          </p>
-        ) : (
+        {/*
+          The locked owner reads exactly what a manager reads. Only the
+          unlocked owner is told the Access column is theirs, because only then
+          is it on the screen.
+        */}
+        <OwnerHidden>
           <p className="mt-2 max-w-3xl text-[12px] text-muted">
             You can read every contract and add to any of them. Changing a field
             somebody else wrote needs a time-boxed access grant, which only Mir
             gives out.
           </p>
-        )}
+        </OwnerHidden>
+        {isOwner(actor) ? (
+          <OwnerOnly>
+            <p className="mt-2 max-w-3xl text-[12px] text-muted">
+              The Access column is yours alone. A grant lets someone edit
+              records they did not create, expires on its own, and is written to
+              the audit log both when you give it and when you take it back.
+            </p>
+          </OwnerOnly>
+        ) : null}
       </Panel>
     </>
   );

@@ -103,6 +103,10 @@ That server is a dev convenience only. Production is Railway Postgres.
 | `npm run db:seed` | Truncate and reseed (deterministic) |
 | `npm run db:reset` | Truncate every table, keep the schema |
 | `npm run db:studio` | Drizzle Studio |
+| `npm run check` | Every check below, in order |
+| `npm run check:shift` | The 6pm-to-6am shift arithmetic. Pure functions, no database. |
+| `npm run check:bot` | Drives the Telegram bot end to end against the local database — buttons, replies, permissions — with the console transport, so nobody is messaged. |
+| `npm run check:cron` | Runs the cron route twice and asserts the second run repeats nothing. |
 
 ## Shape of the code
 
@@ -140,6 +144,70 @@ Colour carries exactly three meanings and nothing else: red is late, gold is
 approaching, green is finished. Four account hues identify the Upwork profiles
 and are used nowhere else.
 
+## The Telegram bot
+
+The office shift is **6pm to 6am Pakistan time, Monday to Friday**, and two
+different clocks follow from that. Both live in `src/lib/time.ts`.
+
+- **The rule clock** (`isInShift`, `workingMsBetween`) counts Monday to Friday
+  nights only. Alert thresholds measure against it, so a client who writes at
+  9am on Saturday has not burned two working days by Monday evening — nobody
+  was rostered to answer.
+- **The delivery clock** (`isOffShiftPkt`) holds messages between 6am and 6pm
+  *every* night, weekends included, because the team watches the work from home
+  at the weekend. A message held on Saturday goes out at 6pm on Saturday, not
+  on Monday.
+
+The window crosses midnight, which is the one thing every helper in that file
+has to respect. `npm run check:shift` pins the arithmetic down.
+
+### What it can do
+
+Alerts arrive as cards with buttons, so the answer happens in the chat rather
+than needing a laptop: **✓ Replied**, **Post update**, **Set next action**,
+**Snooze**, **Note**, **I'll take it**, **Hand to…**. A snooze asks how long
+and then why — the reason is required here exactly as it is on the board.
+
+| Command | Does |
+|---|---|
+| `/today` | Everything outstanding across the agency |
+| `/mine` | The same, narrowed to you |
+| `/find x` | Contracts and clients by name; tap one for its card |
+| `/bids` | Enter this week's bid counts |
+| `/help` | The list |
+
+Replying to any message the bot sent about a contract, with no command, saves
+that text as a note on it.
+
+On a schedule: a **shift brief** at 6pm and a **sweep** at 5am, both per
+person and both silent when there is nothing outstanding; the **bid prompt**
+on Monday at 7pm; an **undelivered report** to Mir on Monday at 8pm listing
+anyone the product tried and failed to reach.
+
+An alert nobody answers is **re-sent every four hours to the whole team** until
+it resolves or somebody snoozes it with a reason. Before this an alert was sent
+once and then went quiet forever, which meant the product's one job stopped the
+moment the first message was ignored.
+
+### Two things to know before changing it
+
+**Identity comes from `from.id`, never from the chat id.** In a private chat
+they are the same number; in a group they are not, and resolving a button press
+by the chat id would make every button in the team group act as whoever the
+group is, which is nobody. Message *context* is the other way round — looked up
+by chat id, because that is what the delivery log is keyed on.
+
+**Callback data is not authority.** It is typed by whoever holds the phone and
+is worth exactly as much as a URL query string: it names a record, it grants
+nothing. Every write goes through `src/lib/ops`, which asks `lib/permissions`
+the same questions the web forms ask. That shared layer is why the bot and the
+screens cannot drift apart — `check:bot` asserts a sales executive is refused
+an edit on a record they did not create, through the bot.
+
+Telegram gives 64 bytes of callback data, so ids travel with their dashes
+stripped and two of them do not fit. Where a button needs a second id, it is
+recovered from the message the button is attached to.
+
 ## Out of scope for v1
 
 Time tracking, invoicing, proposal or bid management, a client-facing portal,
@@ -164,6 +232,7 @@ What the running app needs:
 | `TELEGRAM_ENABLED` | no | Leave unset or `false` and messages go to the log instead of Telegram. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` | only if enabled | Without all three the webhook is not registered and the app says so in the log. |
 | `CRON_SECRET` | for the alert cron | Bearer token `/api/cron/alerts` checks. |
+| `TELEGRAM_GROUP_CHAT_ID` | no | The team group. Unowned alerts, the four-hourly nudges, contract and handover announcements and the shift-start summary post here. Group ids are **negative** — a value without the minus sign silently addresses a private chat that does not exist. Unset means none of it is sent. |
 
 Migrations do not run on deploy. Point `DATABASE_URL` at the hosted database
 once and run them yourself:
@@ -254,3 +323,26 @@ that are days old. Every run after that notifies normally.
 Two GitHub caveats: scheduled runs are queued and can be a few minutes late
 under load (harmless — the thresholds are hours), and GitHub disables schedules
 on a repository with no activity for 60 days.
+
+### Owner mode
+
+The owner's account looks like everybody else's. No role on the header chip,
+no Access column on People, no admin blocks on Settings — the same screens a
+sales executive sees, word for word.
+
+A blank 24px square sits at the end of the header row. Click it **three times
+within about a second** and the owner-only controls appear; three more clicks,
+or a page refresh, and they are gone again. It survives moving between screens,
+because that is ordinary navigation rather than a reload.
+
+It is a **display** state and nothing else. `lib/permissions.ts` still decides
+every access question and still knows the owner is the owner — `OwnerOnly`
+hides controls on a screen, it does not grant or withhold anything. The threat
+it answers is somebody glancing at the screen in an open-plan office, not
+somebody holding the session. Anyone who can read the page's data can see what
+it hides.
+
+Kept in React state on purpose: nothing is written to storage, so there is no
+flag that can get stuck on, no cookie to go stale, and a refresh is always the
+way out. `OwnerModeTrigger` is inert for anyone who is not the owner, and the
+square is rendered for everybody so its absence never says who the owner is.

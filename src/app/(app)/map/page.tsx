@@ -6,8 +6,9 @@ import {
   canOpen,
   type MapSection,
 } from "@/lib/site-map";
-import { GRANT_DURATIONS, ROLE_LABELS, isOwner } from "@/lib/permissions";
+import { GRANT_DURATIONS } from "@/lib/permissions";
 import { PageHead, Panel, PanelTitle } from "@/components/shell";
+import { OwnerHidden, OwnerOnly } from "@/components/owner-mode";
 
 export const metadata = { title: "Map" };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,6 @@ export const dynamic = "force-dynamic";
  */
 export default async function MapPage() {
   const actor = await requireUser();
-  const mine = isOwner(actor);
 
   return (
     <>
@@ -60,8 +60,8 @@ export default async function MapPage() {
           <Step
             n={3}
             when="Every Monday"
-            what="Type four bid counts"
-            detail="The only number Upwork will not give us. It turns the Week page into a funnel."
+            what="Type each account's counts"
+            detail="Bids, chats, contracted, closed, withdrawn — the numbers Upwork will not give us. They turn the Week page into a funnel."
             href="/week"
           />
           <Step
@@ -76,7 +76,7 @@ export default async function MapPage() {
 
       {/* ------------------------------------------------------- your access */}
       <Panel className="mt-4">
-        <PanelTitle note={`${actor.name} · ${ROLE_LABELS[actor.role]}`}>
+        <PanelTitle note={actor.name}>
           What you can open
         </PanelTitle>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -101,16 +101,28 @@ export default async function MapPage() {
               Not about the work — about who may change other people&rsquo;s
               records, and what the system sends.
             </p>
-            <ul className="mt-2.5 flex flex-col gap-1.5">
-              {SECTIONS.filter((s) => s.access === "owner").map((s) => (
-                <AccessRow key={s.key} section={s} open={mine} />
-              ))}
-            </ul>
-            {mine ? null : (
+            {/*
+              Two lists, one shown at a time. The locked owner reads the same
+              page a sales executive reads, down to the closing line — a row
+              lit up as reachable would be the tell.
+            */}
+            <OwnerOnly>
+              <ul className="mt-2.5 flex flex-col gap-1.5">
+                {SECTIONS.filter((s) => s.access === "owner").map((s) => (
+                  <AccessRow key={s.key} section={s} open />
+                ))}
+              </ul>
+            </OwnerOnly>
+            <OwnerHidden>
+              <ul className="mt-2.5 flex flex-col gap-1.5">
+                {SECTIONS.filter((s) => s.access === "owner").map((s) => (
+                  <AccessRow key={s.key} section={s} open={false} />
+                ))}
+              </ul>
               <p className="mt-3 text-[11.5px] text-muted">
                 You do not see these. Ask Mir if you need something from them.
               </p>
-            )}
+            </OwnerHidden>
           </div>
         </div>
       </Panel>

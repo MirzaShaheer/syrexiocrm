@@ -7,7 +7,6 @@ import {
   ROLE_LABELS,
   canManageTeamLinks,
   canViewAdminSettings,
-  isOwner,
   type Role,
 } from "@/lib/permissions";
 import { getLiveCode } from "@/lib/notifications/linking";
@@ -15,6 +14,7 @@ import { telegramEnabled } from "@/lib/notifications";
 import { agoLabel, formatPktDateTime } from "@/lib/time";
 import { MyTelegramLink, UnlinkPerson } from "@/components/telegram-settings";
 import { ChangePassword } from "@/components/change-password";
+import { OwnerHidden, OwnerOnly } from "@/components/owner-mode";
 import { PageHead, Panel, PanelTitle } from "@/components/shell";
 
 export const metadata = { title: "Settings" };
@@ -72,7 +72,7 @@ export default async function SettingsPage() {
     <>
       <PageHead
         title="Settings"
-        note={`Signed in as ${actor.name} · ${ROLE_LABELS[actor.role]}`}
+        note={`Signed in as ${actor.name}`}
         action={
           <Link
             href="/map"
@@ -117,15 +117,18 @@ export default async function SettingsPage() {
               real.
             </>
           )}{" "}
-          Between 11pm and 8am Pakistan time only deadline alerts go out — a
-          milestone running out of time, or one inside its final hour.
-          Everything else waits for the morning rather than being dropped.
+          The shift is 6pm to 6am Pakistan time, and that is when messages go
+          out — every night, including the weekend. Between 6am and 6pm only
+          deadline alerts arrive: a milestone running out of time, or one
+          inside its final hour. Everything else is held until 6pm rather than
+          being dropped. An alert nobody answers is re-sent every four hours,
+          to the whole team, until it is resolved or snoozed with a reason.
         </p>
       </Panel>
 
       {/* ------------------------------------------------------------ admin */}
       {admin ? (
-        <>
+        <OwnerOnly>
           <Panel className="mt-4">
             <PanelTitle note={`${linkedCount} of ${team.length} linked`}>
               Who is linked · owner only
@@ -233,15 +236,22 @@ export default async function SettingsPage() {
               data includes one. It disappears once real data replaces it.
             </p>
           </Panel>
-        </>
-      ) : (
+        </OwnerOnly>
+      ) : null}
+
+      {/*
+        What everyone else sees — and what the owner sees while locked, word
+        for word. Saying "yours" here would be the one line on the screen that
+        gave the account away.
+      */}
+      <OwnerHidden>
         <Panel className="mt-4">
           <PanelTitle>The rest of Settings</PanelTitle>
           <p className="mt-2 max-w-2xl text-[13px] text-ink-2">
             Who else is linked to Telegram, the delivery log, and the Upwork
-            account records are {isOwner(actor) ? "yours" : "Mir's"}. Nothing on
-            those screens is about the work itself — it is about what the system
-            sends and who may change other people&rsquo;s records.
+            account records are Mir&rsquo;s. Nothing on those screens is about
+            the work itself — it is about what the system sends and who may
+            change other people&rsquo;s records.
           </p>
           <p className="mt-2 text-[12px] text-muted">
             Everything you can open is listed on the{" "}
@@ -254,7 +264,7 @@ export default async function SettingsPage() {
             .
           </p>
         </Panel>
-      )}
+      </OwnerHidden>
     </>
   );
 }

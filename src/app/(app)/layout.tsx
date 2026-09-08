@@ -7,7 +7,12 @@ import { AccountSwitcher } from "@/components/account-switcher";
 import { Nav } from "@/components/nav";
 import { Search } from "@/components/search";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ROLE_LABELS, hasLiveAdminGrant } from "@/lib/permissions";
+import {
+  OwnerModeProvider,
+  OwnerModeTrigger,
+  OwnerOnly,
+} from "@/components/owner-mode";
+import { ROLE_LABELS, hasLiveAdminGrant, isOwner } from "@/lib/permissions";
 
 /**
  * Two rows on purpose. The top row is where you are in the product; the
@@ -25,8 +30,9 @@ export default async function AppLayout({
   const elevated = hasLiveAdminGrant(user);
 
   return (
+    <OwnerModeProvider canUnlock={isOwner(user)}>
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-30 border-b border-line bg-page/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-line bg-raised/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-2.5 sm:px-6">
           <Link
             href="/"
@@ -67,11 +73,17 @@ export default async function AppLayout({
               Settings
             </Link>
 
-            {/* Who you are signed in as, and whether you are currently holding
-                a grant — the one piece of state that changes what you may do. */}
+            {/*
+              Just the name. No role for anyone, so no screen advertises whose
+              account can do more than anyone else's — the role is still on the
+              People page, where it is a fact about the team rather than a
+              label on the person holding the laptop.
+            */}
             <span className="hidden items-baseline gap-1.5 rounded-sm border border-line bg-raised px-2 py-1.5 leading-none lg:flex">
               <span className="font-medium text-ink-2">{user.name}</span>
-              <span className="text-muted">{ROLE_LABELS[user.role]}</span>
+              <OwnerOnly>
+                <span className="text-muted">{ROLE_LABELS[user.role]}</span>
+              </OwnerOnly>
               {elevated ? (
                 <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-2">
                   elevated
@@ -87,6 +99,10 @@ export default async function AppLayout({
                 Sign out
               </button>
             </form>
+
+            {/* The blank square. Last thing on the row, so it is genuinely the
+                top right corner and never overlaps a real control. */}
+            <OwnerModeTrigger />
           </div>
         </div>
 
@@ -97,5 +113,6 @@ export default async function AppLayout({
 
       <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6">{children}</main>
     </div>
+    </OwnerModeProvider>
   );
 }
