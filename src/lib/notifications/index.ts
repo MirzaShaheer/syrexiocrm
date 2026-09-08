@@ -41,7 +41,12 @@ export type NotifyInput = {
   body: string;
   contractId?: string | null;
   alertId?: string | null;
-  /** Skip the quiet-hours hold. Only for something the user just did. */
+  /**
+   * Skip the quiet-hours hold. For something the user just did, and for any
+   * rule counting down to a deadline — see `bypassQuietHours` in
+   * lib/alert-rules.ts. A deadline does not keep office hours, and being told
+   * at eight that something was due at two is a post-mortem, not an alert.
+   */
   immediate?: boolean;
 };
 

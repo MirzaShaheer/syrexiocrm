@@ -26,6 +26,16 @@ export type RuleDefinition = {
    * does not pause overnight.
    */
   clock: "working" | "wall";
+  /**
+   * Whether this rule may message somebody between 11pm and 8am.
+   *
+   * True only for a rule counting down to a deadline. A deadline does not
+   * care that it is 3am, and being told at eight that something was due at
+   * two is not a notification, it is a post-mortem. Everything else waits for
+   * the morning: nobody needs waking because a client has not been replied to
+   * or an update was not posted.
+   */
+  bypassQuietHours: boolean;
 };
 
 export const RULES: Record<RuleKey, RuleDefinition> = {
@@ -39,30 +49,37 @@ export const RULES: Record<RuleKey, RuleDefinition> = {
     // "during working days" half of the rule is honoured where it belongs —
     // notifications queue through the night and Sunday instead of firing.
     clock: "wall",
+    bypassQuietHours: false,
   },
   milestone_due: {
     key: "milestone_due",
     label: "Milestone due",
     threshold: 24,
     clock: "wall",
+    // The only rule counting down to a fixed deadline, and so the only one
+    // allowed to buzz at 3am. A deadline does not observe office hours.
+    bypassQuietHours: true,
   },
   stale_contract: {
     key: "stale_contract",
     label: "No update posted",
     threshold: 72,
     clock: "wall",
+    bypassQuietHours: false,
   },
   unassigned: {
     key: "unassigned",
     label: "No owner set",
     threshold: 2,
     clock: "wall",
+    bypassQuietHours: false,
   },
   no_next_action: {
     key: "no_next_action",
     label: "No next action",
     threshold: 0,
     clock: "wall",
+    bypassQuietHours: false,
   },
 };
 

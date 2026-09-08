@@ -86,6 +86,10 @@ export async function POST(request: Request) {
         body,
         contractId: t.contractId,
         alertId: t.alertId,
+        // A rule counting down to a deadline goes out whatever the hour;
+        // everything else waits for the morning. The rule decides, not this
+        // loop, so the answer is the same everywhere it is asked.
+        immediate: RULES[t.ruleKey].bypassQuietHours,
       });
 
       // Stamped whether it went out or was queued, so it is never sent twice.

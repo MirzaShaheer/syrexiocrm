@@ -106,8 +106,9 @@ export default async function SettingsPage() {
               real.
             </>
           )}{" "}
-          Nothing sends between 11pm and 8am Pakistan time — it waits for the
-          morning rather than being dropped.
+          Between 11pm and 8am Pakistan time only deadline alerts go out — a
+          milestone running out of time, or one inside its final hour.
+          Everything else waits for the morning rather than being dropped.
         </p>
       </Panel>
 
