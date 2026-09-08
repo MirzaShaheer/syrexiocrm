@@ -184,6 +184,7 @@ async function handleCommand(
         template: `command_${command}`,
         body: brief.body,
         userId: actor.id,
+        keyboard: brief.keyboard,
       });
       return;
     }

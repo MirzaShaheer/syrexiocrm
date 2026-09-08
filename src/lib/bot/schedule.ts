@@ -108,6 +108,7 @@ async function sendBriefs(now: Date): Promise<number> {
       userId: member.userId,
       template: "brief_shift_start",
       body: `${brief.body}\n\n${appUrl()}/today`,
+      keyboard: brief.keyboard,
       immediate: true,
     });
     if (outcome.status === "sent") sent++;
@@ -115,7 +116,11 @@ async function sendBriefs(now: Date): Promise<number> {
 
   const all = await buildBrief({ heading: "Tonight, across the agency:", now });
   if (!all.empty) {
-    await sendToGroup({ template: "brief_shift_start_group", body: all.body });
+    await sendToGroup({
+      template: "brief_shift_start_group",
+      body: all.body,
+      keyboard: all.keyboard,
+    });
   }
 
   return sent;
@@ -141,6 +146,7 @@ async function sendSweeps(now: Date): Promise<number> {
       userId: member.userId,
       template: "sweep_shift_end",
       body: brief.body,
+      keyboard: brief.keyboard,
       immediate: true,
     });
     if (outcome.status === "sent") sent++;

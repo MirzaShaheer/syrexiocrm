@@ -132,6 +132,30 @@ async function main() {
     await message("/today");
     check("/today answers", (await lastMessage()).body.length > 0, true);
 
+    /*
+     * A digest you cannot act on sends you back to a laptop, which is the
+     * thing the buttons exist to remove. The first version of /today was text
+     * only and read perfectly well while doing nothing.
+     */
+    const [todayMsg] = await db
+      .select({ keyboard: notifications.keyboard, body: notifications.body })
+      .from(notifications)
+      .where(eq(notifications.chatId, CHAT))
+      .orderBy(sql`message_id::bigint desc nulls last`)
+      .limit(1);
+    check(
+      "/today rows are tappable",
+      (todayMsg.keyboard?.length ?? 0) > 0,
+      true,
+    );
+    check(
+      "and every button opens a contract card",
+      (todayMsg.keyboard ?? []).every((row) =>
+        row.every((b) => b.data.startsWith("card:")),
+      ),
+      true,
+    );
+
     await message("/find zzzznothingmatches");
     check(
       "/find says when nothing matches",
